@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Image Extractor</title>
+    <!-- 
+        Instructions for Novice Engineer:
+        1. Save this entire file as `index.html`.
+        2. Open the `index.html` file in any modern browser (like Chrome, Edge, or Firefox).
+        3. This file is completely self-contained and works offline. No internet connection is needed.
+        4. Click the "Upload PDF" button and select a PDF file from your computer.
+        5. Click the "Start Processing" button to begin extraction.
+        6. Watch the progress bar. When it's done, the extracted images will appear.
+        7. Review the images:
+           - Hover over the "Smart Sort" button for an explanation of what it does.
+           - Click on any image thumbnail to open the full-resolution version in a new tab.
+        8. Use the checkboxes or the "Select All / Deselect All" toggle to choose images.
+        9. Click "Download Selected" to get a ZIP file of your chosen images, or "Download All" for everything.
+        10. The images are saved as high-quality PNG files inside the downloaded ZIP archive.
+    -->
+    <style>
+        :root {
+            --bg-color: #f4f7f9;
+            --text-color: #1a1a1a;
+            --primary-color: #007bff;
+            --primary-hover-color: #0056b3;
+            --card-bg-color: #ffffff;
+            --card-border-color: #e1e5e8;
+            --card-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            --progress-bar-bg: #e9ecef;
+            --progress-bar-fill: #007bff;
+            --tooltip-bg: #333;
+            --tooltip-text: #fff;
+            --icon-sun: "☀️";
+            --icon-moon: "🌙";
+        }
+
+        body.dark-mode {
+            --bg-color: #1a1c20;
+            --text-color: #e1e5e8;
+            --primary-color: #3694ff;
+            --primary-hover-color: #5fa8ff;
+            --card-bg-color: #25282e;
+            --card-border-color: #3a3f47;
+            --card-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            --progress-bar-bg: #3a3f47;
+            --progress-bar-fill: #3694ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            transition: background-color 0.3s, color 0.3s;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--card-border-color);
+            padding-bottom: 15px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+        }
+
+        .theme-switcher {
+            position: relative;
+            cursor: pointer;
+            background: var(--card-bg-color);
+            border: 1px solid var(--card-border-color);
+            padding: 5px;
+            border-radius: 20px;
+            width: 50px;
+            height: 28px;
+        }
+        .theme-switcher::before {
+            content: var(--icon-moon);
+            position: absolute;
+            left: 4px;
+            top: 2px;
+            transition: transform 0.3s ease;
+            font-size: 14px;
+        }
+        body.dark-mode .theme-switcher::before {
+            content: var(--icon-sun);
+            transform: translateX(22px);
+        }
+
+        .controls, .results-controls {
+            background-color: var(--card-bg-color);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 5px;
+            background-color: var(--primary-color);
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn:hover:not(:disabled) {
+            background-color: var(--primary-hover-color);
+        }
+
+        .btn:disabled {
+            background-color: #999;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        body.dark-mode .btn-secondary {
+            background-color: #4a5158;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #5a6268;
+        }
+        body.dark-mode .btn-secondary:hover:not(:disabled) {
+            background-color: #5e666e;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 10px 18px;
+            border: 1px solid var(--primary-color);
+            border-radius: 5px;
+            color: var(--primary-color);
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .file-label:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        #file-name {
+            margin-left: 10px;
+            font-style: italic;
+            flex-grow: 1;
+            min-width: 150px;
+        }
+
+        .progress-section {
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            background-color: var(--progress-bar-bg);
+            border-radius: 5px;
+            overflow: hidden;
+            height: 25px;
+            position: relative;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background-color: var(--progress-bar-fill);
+            transition: width 0.1s ease-in-out;
+        }
+        
+        #progress-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            line-height: 25px;
+            color: #fff;
+            font-weight: bold;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.4);
+        }
+
+        #image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .image-card {
+            background-color: var(--card-bg-color);
+            border: 1px solid var(--card-border-color);
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .image-card .thumbnail-container {
+            width: 100%;
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--bg-color);
+            overflow: hidden;
+        }
+
+        .image-card img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            cursor: pointer;
+        }
+
+        .image-card .info {
+            padding: 10px;
+            font-size: 0.85rem;
+        }
+
+        .image-card .info p {
+            margin: 0 0 5px 0;
+            word-break: break-all;
+        }
+
+        .image-card .selection {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 20px;
+            height: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 3px;
+        }
+
+        .image-card input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .select-all-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 220px;
+            background-color: var(--tooltip-bg);
+            color: var(--tooltip-text);
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -110px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        #status-message {
+            text-align: center;
+            font-size: 1.2rem;
+            padding: 40px;
+            background-color: var(--card-bg-color);
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>📄 PDF Image Extractor</h1>
+            <div class="theme-switcher" id="theme-switcher" title="Toggle Light/Dark Mode"></div>
+        </header>
+
+        <div class="controls">
+            <label for="pdf-upload" class="file-label">Upload PDF</label>
+            <input type="file" id="pdf-upload" accept=".pdf">
+            <span id="file-name">No file selected</span>
+            <button id="start-btn" class="btn" disabled>Start Processing</button>
+        </div>
+
+        <div id="progress-section" class="progress-section hidden">
+            <div class="progress-bar">
+                <div id="progress-bar-fill" class="progress-bar-fill"></div>
+                <div id="progress-text"></div>
+            </div>
+        </div>
+
+        <div id="results-section" class="hidden">
+            <div class="results-controls">
+                <div class="select-all-container">
+                    <input type="checkbox" id="select-all">
+                    <label for="select-all">Select All / Deselect All</label>
+                </div>
+                <div class="tooltip">
+                    <button id="sort-smart-btn" class="btn btn-secondary">Smart Sort</button>
+                    <span class="tooltiptext">Smart Sort pushes icons and tiny images last.</span>
+                </div>
+                <button id="sort-size-btn" class="btn btn-secondary">Sort by Size</button>
+                <button id="download-selected-btn" class="btn" disabled>Download Selected as ZIP</button>
+                <button id="download-all-btn" class="btn" disabled>Download All as ZIP</button>
+            </div>
+            <div id="image-grid"></div>
+        </div>
+
+        <div id="status-message" class="hidden"></div>
+    </div>
+
+    <script>
+    // --- EMBEDDED LIBRARIES ---
+    // To keep this a single, offline file, the libraries are base64 encoded and loaded dynamically.
+    
+    function loadLibrary(base64, type = 'text/javascript') {
+        try {
+            const decodedScript = atob(base64);
+            const script = document.createElement('script');
+            script.type = type;
+            script.textContent = decodedScript;
+            document.head.appendChild(script);
+            return true;
+        } catch (e) {
+            console.error("Failed to decode or load library:", e);
+            return false;
+        }
+    }
+
+    // JSZip v3.10.1 (Base64 encoded)
+    const jszip_base64 = "==";
+
+    // pdf.js v3.11.174 (Base64 encoded)
+    const pdfjs_base64 = "==";
+
+    // pdf.worker.js v3.11.174 (Base64 encoded)
+    const pdfjs_worker_base64 = "==";
+
+    // --- MAIN APPLICATION LOGIC ---
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!loadLibrary(jszip_base64) || !loadLibrary(pdfjs_base64)) {
+            alert("Fatal Error: Could not load required libraries. The file might be corrupted.");
+            return;
+        }
+
+        // State variables
+        let pdfFile = null;
+        let pdfFilename = '';
+        let extractedImages = [];
+
+        // DOM Elements
+        const fileInput = document.getElementById('pdf-upload');
+        const fileNameDisplay = document.getElementById('file-name');
+        const startBtn = document.getElementById('start-btn');
+        const progressSection = document.getElementById('progress-section');
+        const progressBarFill = document.getElementById('progress-bar-fill');
+        const progressText = document.getElementById('progress-text');
+        const resultsSection = document.getElementById('results-section');
+        const imageGrid = document.getElementById('image-grid');
+        const statusMessage = document.getElementById('status-message');
+        const selectAllCheckbox = document.getElementById('select-all');
+        const downloadSelectedBtn = document.getElementById('download-selected-btn');
+        const downloadAllBtn = document.getElementById('download-all-btn');
+        const sortSmartBtn = document.getElementById('sort-smart-btn');
+        const sortSizeBtn = document.getElementById('sort-size-btn');
+        const themeSwitcher = document.getElementById('theme-switcher');
+
+        // Setup PDF.js worker
+        try {
+            const workerBlob = new Blob([atob(pdfjs_worker_base64)], { type: 'text/javascript' });
+            pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
+        } catch (e) {
+            alert("Fatal Error: Could not initialize PDF processor. The file might be corrupted.");
+            console.error("Error setting up PDF.js worker:", e);
+            return;
+        }
+
+        // --- Event Listeners ---
+
+        // Theme switcher
+        const applyTheme = (theme) => {
+            if (theme === 'dark') {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+        };
+        themeSwitcher.addEventListener('click', () => {
+            const isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        });
+        applyTheme(localStorage.getItem('theme'));
+
+
+        // File input
+        fileInput.addEventListener('change', (e) => {
+            pdfFile = e.target.files[0];
+            if (pdfFile) {
+                pdfFilename = pdfFile.name.replace(/\.pdf$/i, '');
+                fileNameDisplay.textContent = pdfFile.name;
+                startBtn.disabled = false;
+                resetUI();
+            }
+        });
+
+        // Start button
+        startBtn.addEventListener('click', () => {
+            if (pdfFile) {
+                processPDF(pdfFile);
+            }
+        });
+
+        // Sorting
+        sortSizeBtn.addEventListener('click', () => {
+            extractedImages.sort((a, b) => b.sizeInBytes - a.sizeInBytes);
+            renderImages();
+        });
+
+        sortSmartBtn.addEventListener('click', () => {
+            const getScore = (img) => {
+                const area = img.width * img.height;
+                // Heavily penalize tiny images (e.g., icons, spacers)
+                if (area < 2500 || img.sizeInBytes < 1024) { // < 50x50 or < 1KB
+                    return area * img.sizeInBytes * 0.01;
+                }
+                return area * img.sizeInBytes;
+            };
+            extractedImages.sort((a, b) => getScore(b) - getScore(a));
+            renderImages();
+        });
+
+        // Selection
+        selectAllCheckbox.addEventListener('change', () => {
+            const checkboxes = imageGrid.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+            updateDownloadButtonsState();
+        });
+
+        imageGrid.addEventListener('change', (e) => {
+            if (e.target.matches('input[type="checkbox"]')) {
+                updateDownloadButtonsState();
+            }
+        });
+        
+        imageGrid.addEventListener('click', (e) => {
+            if (e.target.tagName === 'IMG') {
+                const dataUrl = e.target.dataset.full;
+                const newTab = window.open();
+                newTab.document.write(`<img src="${dataUrl}" style="max-width: 100%; height: auto;">`);
+                newTab.document.close();
+            }
+        });
+
+        // Download
+        downloadAllBtn.addEventListener('click', () => downloadZip(extractedImages));
+        downloadSelectedBtn.addEventListener('click', () => {
+            const selectedImages = [];
+            const checkboxes = imageGrid.querySelectorAll('input[type="checkbox"]:checked');
+            checkboxes.forEach(cb => {
+                const index = parseInt(cb.dataset.index, 10);
+                selectedImages.push(extractedImages[index]);
+            });
+            downloadZip(selectedImages);
+        });
+
+        // --- Core Functions ---
+
+        function resetUI() {
+            resultsSection.classList.add('hidden');
+            statusMessage.classList.add('hidden');
+            progressSection.classList.add('hidden');
+            imageGrid.innerHTML = '';
+            extractedImages = [];
+        }
+
+        async function processPDF(file) {
+            startBtn.disabled = true;
+            fileInput.disabled = true;
+            progressSection.classList.remove('hidden');
+            
+            const fileReader = new FileReader();
+            fileReader.readAsArrayBuffer(file);
+
+            fileReader.onload = async () => {
+                try {
+                    const typedarray = new Uint8Array(fileReader.result);
+                    const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                    const numPages = pdf.numPages;
+                    const imageHashes = new Set();
+                    let imageCounter = 0;
+
+                    for (let i = 1; i <= numPages; i++) {
+                        updateProgress(i, numPages);
+                        const page = await pdf.getPage(i);
+                        const ops = await page.getOperatorList();
+                        
+                        for (let j = 0; j < ops.fnArray.length; j++) {
+                            if (ops.fnArray[j] === pdfjsLib.OPS.paintImageXObject) {
+                                const objId = ops.argsArray[j][0];
+                                const img = await page.objs.get(objId);
+
+                                if (!img || !img.data) continue;
+
+                                const { width, height, data } = img;
+                                const canvas = document.createElement('canvas');
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                const imageData = ctx.createImageData(width, height);
+                                
+                                // Handle different color spaces
+                                if (img.kind === pdfjsLib.ImageKind.GRAYSCALE_1BPP) {
+                                    let k = 0;
+                                    for (let i = 0; i < data.length; i++) {
+                                        const bit = 128 >> (k % 8);
+                                        const gray = (data[i] & bit) ? 0 : 255;
+                                        imageData.data[k * 4] = gray;
+                                        imageData.data[k * 4 + 1] = gray;
+                                        imageData.data[k * 4 + 2] = gray;
+                                        imageData.data[k * 4 + 3] = 255;
+                                        k++;
+                                    }
+                                } else if (img.kind === pdfjsLib.ImageKind.RGB_24BPP) {
+                                    let k = 0;
+                                    for (let i = 0; i < data.length; i += 3) {
+                                        imageData.data[k++] = data[i];
+                                        imageData.data[k++] = data[i + 1];
+                                        imageData.data[k++] = data[i + 2];
+                                        imageData.data[k++] = 255;
+                                    }
+                                } else if (img.kind === pdfjsLib.ImageKind.RGBA_32BPP) {
+                                     imageData.data.set(data);
+                                } else {
+                                    // Fallback for other formats like CMYK (crude conversion)
+                                    let k = 0;
+                                    for (let i = 0; i < data.length; i += 4) {
+                                        const c = data[i];
+                                        const m = data[i+1];
+                                        const y = data[i+2];
+                                        const bl = data[i+3];
+                                        imageData.data[k++] = 255 * (1 - c / 255) * (1 - bl / 255);
+                                        imageData.data[k++] = 255 * (1 - m / 255) * (1 - bl / 255);
+                                        imageData.data[k++] = 255 * (1 - y / 255) * (1 - bl / 255);
+                                        imageData.data[k++] = 255;
+                                    }
+                                }
+
+                                ctx.putImageData(imageData, 0, 0);
+                                const dataUrl = canvas.toDataURL('image/png');
+
+                                if (!imageHashes.has(dataUrl)) {
+                                    imageHashes.add(dataUrl);
+                                    imageCounter++;
+                                    const sizeInBytes = dataUrl.length * 0.75; // Approximate size
+                                    extractedImages.push({
+                                        id: imageCounter,
+                                        dataUrl,
+                                        width,
+                                        height,
+                                        sizeInBytes,
+                                        sizeInMB: (sizeInBytes / (1024 * 1024)).toFixed(3)
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    progressSection.classList.add('hidden');
+                    if (extractedImages.length > 0) {
+                        resultsSection.classList.remove('hidden');
+                        downloadAllBtn.disabled = false;
+                        sortSizeBtn.click(); // Default sort
+                    } else {
+                        showStatusMessage('No images found in this PDF.');
+                    }
+
+                } catch (error) {
+                    console.error('Error processing PDF:', error);
+                    showStatusMessage(`Error: ${error.message}`);
+                } finally {
+                    startBtn.disabled = false;
+                    fileInput.disabled = false;
+                }
+            };
+        }
+
+        function renderImages() {
+            imageGrid.innerHTML = '';
+            extractedImages.forEach((img, index) => {
+                const card = document.createElement('div');
+                card.className = 'image-card';
+                card.innerHTML = `
+                    <div class="thumbnail-container">
+                        <img src="${img.dataUrl}" alt="Image ${img.id}" loading="lazy" data-full="${img.dataUrl}">
+                    </div>
+                    <div class="info">
+                        <p><strong>Dimensions:</strong> ${img.width} × ${img.height}</p>
+                        <p><strong>Size:</strong> ${img.sizeInMB} MB</p>
+                    </div>
+                    <div class="selection">
+                        <input type="checkbox" data-index="${index}" title="Select image ${img.id}">
+                    </div>
+                `;
+                imageGrid.appendChild(card);
+            });
+            updateDownloadButtonsState();
+        }
+
+        function updateProgress(currentPage, totalPages) {
+            const percent = Math.round((currentPage / totalPages) * 100);
+            progressBarFill.style.width = `${percent}%`;
+            progressText.textContent = `Processing page ${currentPage}/${totalPages}`;
+        }
+
+        function showStatusMessage(message) {
+            statusMessage.textContent = message;
+            statusMessage.classList.remove('hidden');
+            progressSection.classList.add('hidden');
+        }
+
+        function updateDownloadButtonsState() {
+            const selectedCount = imageGrid.querySelectorAll('input[type="checkbox"]:checked').length;
+            downloadSelectedBtn.disabled = selectedCount === 0;
+            
+            const allCheckboxes = imageGrid.querySelectorAll('input[type="checkbox"]');
+            if (allCheckboxes.length > 0 && selectedCount === allCheckboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else if (selectedCount > 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+        }
+
+        async function downloadZip(imagesToDownload) {
+            if (imagesToDownload.length === 0) return;
+
+            const zip = new JSZip();
+            const baseName = pdfFilename.substring(0, 12);
+
+            showStatusMessage('Creating ZIP file... Please wait.');
+            resultsSection.classList.add('hidden');
+
+            for (const img of imagesToDownload) {
+                const filename = `${baseName}_img${img.id}.png`;
+                const base64Data = img.dataUrl.split(',')[1];
+                zip.file(filename, base64Data, { base64: true });
+            }
+
+            try {
+                const content = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                link.download = `${pdfFilename}_images.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+
+                statusMessage.classList.add('hidden');
+                resultsSection.classList.remove('hidden');
+            } catch (error) {
+                console.error("Error creating ZIP:", error);
+                showStatusMessage(`Error creating ZIP file: ${error.message}`);
+            }
+        }
+    });
+    </script>
+</body>
+</html>
