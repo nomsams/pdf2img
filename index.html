@@ -1,611 +1,906 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Image Extractor (Mobile Optimized)</title>
-    <style>
-        :root {
-            --bg-color: #f4f7f9;
-            --text-color: #1a1a1a;
-            --primary-color: #007bff;
-            --primary-hover-color: #0056b3;
-            --secondary-color: #6c757d;
-            --secondary-hover-color: #5a6268;
-            --card-bg-color: #ffffff;
-            --border-color: #dee2e6;
-            --progress-bar-bg: #e9ecef;
-            --tooltip-bg: #343a40;
-            --tooltip-text: #ffffff;
-            --shadow: 0 4px 8px rgba(0,0,0,0.05);
-            --danger-color: #dc3545;
-        }
-
-        body.dark-mode {
-            --bg-color: #1a1c20;
-            --text-color: #e1e1e1;
-            --primary-color: #0d6efd;
-            --primary-hover-color: #0b5ed7;
-            --secondary-color: #495057;
-            --secondary-hover-color: #5c636a;
-            --card-bg-color: #2b2f36;
-            --border-color: #495057;
-            --progress-bar-bg: #343a40;
-            --shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        html { scroll-behavior: smooth; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            transition: background-color 0.3s, color 0.3s;
-            padding: 10px;
-            touch-action: manipulation; /* Prevents double-tap zoom on controls */
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: var(--card-bg-color);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            border: 1px solid var(--border-color);
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-        }
-        h1 { font-size: 1.5rem; }
-
-        .upload-section {
-            text-align: center;
-            padding: 40px 20px;
-            border: 2px dashed var(--border-color);
-            border-radius: 8px;
-            margin-bottom: 20px;
-            cursor: pointer;
-            transition: background-color 0.2s, border-color 0.2s;
-        }
-        .upload-section.drag-over { border-color: var(--primary-color); background-color: var(--progress-bar-bg); }
-        .upload-section p { margin-bottom: 15px; color: var(--secondary-color); pointer-events: none; }
-
-        .btn {
-            display: inline-block;
-            padding: 12px 24px;
-            font-size: 1rem;
-            font-weight: 600;
-            text-align: center;
-            text-decoration: none;
-            cursor: pointer;
-            border: none;
-            border-radius: 6px;
-            transition: background-color 0.2s, transform 0.1s, opacity 0.2s;
-        }
-        .btn:active { transform: scale(0.98); }
-        .btn:disabled { background-color: var(--secondary-color); cursor: not-allowed; opacity: 0.6; }
-        .btn-primary { background-color: var(--primary-color); color: white; }
-        .btn-primary:hover:not(:disabled) { background-color: var(--primary-hover-color); }
-        .btn-secondary { background-color: var(--secondary-color); color: white; }
-        .btn-secondary:hover:not(:disabled) { background-color: var(--secondary-hover-color); }
-        .btn-danger { background-color: var(--danger-color); color: white; }
-
-        input[type="file"] { display: none; }
-        #file-name { margin-top: 15px; font-style: italic; color: var(--secondary-color); }
-
-        .processing-section { display: none; margin-top: 20px; }
-        .progress-bar-container { width: 100%; background-color: var(--progress-bar-bg); border-radius: 8px; overflow: hidden; height: 30px; margin-bottom: 10px; }
-        #progress-bar { width: 0%; height: 100%; background-color: var(--primary-color); transition: width 0.2s ease-in-out; }
-        #progress-text { text-align: center; font-weight: 500; }
-
-        .results-section { display: none; }
-        .toolbar { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; padding: 15px; background-color: var(--bg-color); border-radius: 8px; margin-bottom: 20px; }
-        .toolbar-group { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-        .toolbar label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
-        .toolbar input[type="number"] { width: 70px; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background-color: var(--card-bg-color); color: var(--text-color); }
-        #selected-count { font-weight: bold; color: var(--primary-color); }
-
-        #image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; }
-        .image-card { position: relative; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background-color: var(--card-bg-color); box-shadow: var(--shadow); transition: transform 0.2s, box-shadow 0.2s; }
-        .image-card:hover { transform: translateY(-5px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
-        .image-card .thumbnail-link { display: block; height: 150px; background-color: var(--progress-bar-bg); cursor: zoom-in; }
-        .image-card img { width: 100%; height: 100%; object-fit: contain; display: block; opacity: 0; transition: opacity 0.3s; }
-        .image-card img.loaded { opacity: 1; }
-        .image-card .info { padding: 10px; font-size: 0.8rem; }
-        .image-card .info p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .image-card .checkbox { position: absolute; top: 10px; left: 10px; width: 24px; height: 24px; cursor: pointer; accent-color: var(--primary-color); }
-        .image-card .download-btn { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
-        .image-card:hover .download-btn { opacity: 1; }
-
-        #status-message { text-align: center; padding: 40px; font-size: 1.2rem; color: var(--secondary-color); display: none; }
-        
-        /* Modal Lightbox */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9); }
-        .modal-content { position: relative; margin: auto; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-        .modal-content img { max-width: 95vw; max-height: 95vh; object-fit: contain; }
-        .modal-close { position: absolute; top: 15px; right: 25px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; user-select: none; }
-        .modal-nav { position: absolute; top: 50%; transform: translateY(-50%); background-color: rgba(0,0,0,0.3); color: white; border: none; font-size: 2.5rem; padding: 15px; cursor: pointer; user-select: none; transition: background-color 0.2s; border-radius: 8px; }
-        .modal-nav:hover { background-color: rgba(0,0,0,0.6); }
-        .modal-prev { left: 10px; }
-        .modal-next { right: 10px; }
-
-        /* Mobile-specific styles */
-        @media (max-width: 768px) {
-            body { padding: 5px; }
-            .container { padding: 15px; }
-            h1 { font-size: 1.3rem; }
-            .toolbar { flex-direction: column; align-items: stretch; gap: 20px; }
-            .toolbar-group { justify-content: space-between; }
-            .toolbar-group:last-child { flex-direction: column; gap: 10px; align-items: stretch; }
-            .toolbar-group:last-child .btn { width: 100%; }
-            .modal-nav { font-size: 2rem; padding: 10px; }
-            .modal-nav.modal-prev { left: 5px; }
-            .modal-nav.modal-next { right: 5px; }
-        }
-        @media (hover: none) { /* Hide desktop-only hover effects on touch devices */
-            .image-card:hover .download-btn { opacity: 1; }
-        }
-    </style>
+<meta charset="utf-8" />
+<title>PDF Image Extractor – Single-File (Offline)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0b0d10;
+    --card: #12161c;
+    --muted: #9fb0c0;
+    --text: #e8eef5;
+    --accent: #61dafb;
+    --ok: #3ddc97;
+    --warn: #ffcc66;
+    --danger: #ff6b6b;
+    --border: #273240;
+  }
+  :root.light {
+    --bg: #f7f9fc;
+    --card: #ffffff;
+    --muted: #5a6a7a;
+    --text: #0b0d10;
+    --accent: #0077ff;
+    --ok: #1a8e5f;
+    --warn: #b8860b;
+    --danger: #b00020;
+    --border: #d8e0ea;
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .wrap {
+    max-width: 1100px; margin: 0 auto; padding: 16px;
+  }
+  h1 { font-size: 20px; margin: 0 0 8px 0; letter-spacing: 0.3px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .spacer { flex: 1; }
+  button, label.btn, .toggle {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    padding: 10px 12px; border-radius: 12px; cursor: pointer; font-weight: 600;
+    transition: transform .06s ease, background .2s ease, border .2s ease;
+    user-select: none;
+  }
+  button:hover, label.btn:hover { transform: translateY(-1px); }
+  button.primary { background: linear-gradient(180deg, var(--accent), #2aa3d6); color: #001218; border-color: transparent; }
+  button.success { background: linear-gradient(180deg, var(--ok), #2dad78); color: #001b11; border-color: transparent; }
+  button.warn { background: linear-gradient(180deg, var(--warn), #d7a13c); color: #2d1f00; border-color: transparent; }
+  input[type="file"] { display:none; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: -4px; }
+  .panel {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 14px 14px;
+  }
+  .progress {
+    height: 12px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border);
+  }
+  .bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), #9bffd6); transition: width .15s ease; }
+  .statline { display: flex; gap: 10px; align-items:center; font-size: 13px; color: var(--muted); }
+  .grid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .thumb {
+    display: block; width: 100%; max-height: 200px; object-fit: contain; background: rgba(0,0,0,0.12);
+  }
+  .meta { padding: 10px 12px; display: grid; gap: 6px; font-size: 13px; }
+  .meta .row { justify-content: space-between; }
+  .badge { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tooltip {
+    position: relative; display: inline-block;
+  }
+  .tooltip:hover::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    padding: 8px 10px; border-radius: 10px; min-width: 180px; max-width: 260px;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+    white-space: normal; pointer-events: none; z-index: 20; font-size: 12px;
+  }
+  .empty {
+    padding: 24px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 16px;
+  }
+  .small { font-size: 12px; color: var(--muted); }
+  .danger { color: var(--danger); }
+  .ok { color: var(--ok); }
+  .toggle {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; font-weight: 600;
+  }
+  .toggle input { width: 0; height: 0; appearance: none; }
+  .pill {
+    width: 44px; height: 24px; background: rgba(255,255,255,0.12); border-radius: 999px; position: relative; border: 1px solid var(--border);
+  }
+  .dot { position: absolute; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border-radius: 50%; background: var(--text); left: 3px; transition: left .15s ease; }
+  .toggle input:checked + .pill .dot { left: 23px; }
+  .sr { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+  .footer-note { margin-top: 30px; font-size: 12px; color: var(--muted); }
+</style>
 </head>
-<body>
+<body class="">
+<header>
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <h1>📄 PDF Image Extractor</h1>
+        <div class="hint">Single-file, offline. Extracts embedded images as high-quality PNG with sort, preview, and selective ZIP download.</div>
+      </div>
+      <div class="spacer"></div>
+      <label class="toggle" title="Light/Dark mode">
+        <span>Light</span>
+        <input id="themeToggle" type="checkbox" />
+        <span class="pill"><span class="dot"></span></span>
+        <span>Dark</span>
+      </label>
+    </div>
+  </div>
+</header>
 
-    <div class="container">
-        <header>
-            <h1>📄 PDF Image Extractor</h1>
-            <div class="theme-switcher" id="theme-switcher" title="Toggle Light/Dark Mode">🌙</div>
-        </header>
+<main class="wrap" style="display:flex; flex-direction: column; gap: 16px;">
 
-        <main>
-            <label for="pdf-file" class="upload-section" id="upload-section">
-                <p>Tap or Drag & Drop a PDF file here</p>
-                <span class="btn btn-primary">Upload PDF</span>
-                <input type="file" id="pdf-file" accept=".pdf">
-                <p id="file-name"></p>
-            </label>
-            <div id="post-upload-controls" style="text-align: center; margin-bottom: 20px;">
-                 <button class="btn btn-primary" id="start-btn" disabled>Start Processing</button>
-                 <button class="btn btn-danger" id="reset-btn" style="display: none;">Clear & Reset</button>
-            </div>
+  <section class="panel">
+    <div class="row" style="gap: 8px;">
+      <label for="fileInput" class="btn tooltip" data-tip="Choose a PDF from your computer (processed 100% locally).">
+        📥 Upload PDF
+      </label>
+      <input id="fileInput" type="file" accept="application/pdf,.pdf"/>
 
-            <div class="processing-section" id="processing-section">
-                <div class="progress-bar-container"><div id="progress-bar"></div></div>
-                <p id="progress-text">Initializing...</p>
-            </div>
+      <button id="startBtn" class="primary tooltip" disabled
+              data-tip="Starts extraction. Processing progress shown below.">
+        ▶️ Start Processing
+      </button>
 
-            <div id="status-message"></div>
+      <button id="selectAllBtn" disabled>Select All</button>
+      <button id="deselectAllBtn" disabled>Deselet All</button>
 
-            <div class="results-section" id="results-section">
-                <div class="toolbar">
-                    <div class="toolbar-group">
-                        <label><input type="checkbox" id="select-all"> Select All</label>
-                        <span id="selected-count">0 selected</span>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn btn-secondary" id="sort-size-btn">Sort by Size</button>
-                        <button class="btn btn-secondary" id="smart-sort-btn" data-tooltip="Pushes tiny images last">Smart Sort</button>
-                    </div>
-                    <div class="toolbar-group">
-                        <span>Filter:</span>
-                        <label>W ≥ <input type="number" id="min-width" placeholder="px" min="0"></label>
-                        <label>H ≥ <input type="number" id="min-height" placeholder="px" min="0"></label>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn btn-primary" id="download-selected-btn" disabled>Download Selected</button>
-                        <button class="btn btn-primary" id="download-all-btn" disabled>Download All</button>
-                    </div>
-                </div>
-                <div id="image-grid"></div>
-            </div>
-        </main>
+      <div class="tooltip" data-tip="Default sorts by pixel area (width×height), largest first. Smart Sort also considers file size and pushes icons/tiny images last.">
+        <button id="defaultSortBtn" disabled>Sort: Size (default)</button>
+      </div>
+      <div class="tooltip" data-tip="Smart Sort pushes probable icons and tiny images last by blending area and MB size against the average.">
+        <button id="smartSortBtn" class="warn" disabled>Smart Sort</button>
+      </div>
+
+      <button id="downloadSelectedZipBtn" class="success" disabled>Download Selected (ZIP)</button>
+      <button id="downloadAllZipBtn" class="" disabled>Download All (ZIP)</button>
+
+      <div class="spacer"></div>
+      <div class="small" id="pdfName">No file chosen</div>
     </div>
 
-    <!-- Modal Lightbox Structure -->
-    <div id="image-modal" class="modal">
-        <span class="modal-close" title="Close (Esc)">&times;</span>
-        <button class="modal-nav modal-prev" title="Previous (←)">&#10094;</button>
-        <div class="modal-content" id="modal-content">
-            <img id="modal-image">
-        </div>
-        <button class="modal-nav modal-next" title="Next (→)">&#10095;</button>
+    <div style="margin-top: 12px; display:grid; gap:8px;">
+      <div class="progress"><div id="bar" class="bar"></div></div>
+      <div class="statline">
+        <div id="progressText">Waiting…</div>
+        <div class="spacer"></div>
+        <div id="stats" class="small"></div>
+      </div>
     </div>
+  </section>
 
-    <!-- EMBEDDED LIBRARIES FOR OFFLINE USE -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.worker.min.js`;
-    </script>
+  <section id="gallery" class="grid">
+    <div class="empty">No images yet. Upload a PDF and click <b>Start Processing</b> to begin.<br/><span class="small">If the PDF has no images, you’ll see a notice.</span></div>
+  </section>
 
-    <!-- APPLICATION LOGIC -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- DOM Elements ---
-            const uploadSection = document.getElementById('upload-section');
-            const postUploadControls = document.getElementById('post-upload-controls');
-            const pdfFileInput = document.getElementById('pdf-file');
-            const fileNameDisplay = document.getElementById('file-name');
-            const startBtn = document.getElementById('start-btn');
-            const resetBtn = document.getElementById('reset-btn');
-            const themeSwitcher = document.getElementById('theme-switcher');
-            const processingSection = document.getElementById('processing-section');
-            const resultsSection = document.getElementById('results-section');
-            const progressBar = document.getElementById('progress-bar');
-            const progressText = document.getElementById('progress-text');
-            const statusMessage = document.getElementById('status-message');
-            const imageGrid = document.getElementById('image-grid');
-            const selectAllCheckbox = document.getElementById('select-all');
-            const selectedCountDisplay = document.getElementById('selected-count');
-            const sortSizeBtn = document.getElementById('sort-size-btn');
-            const smartSortBtn = document.getElementById('smart-sort-btn');
-            const minWidthInput = document.getElementById('min-width');
-            const minHeightInput = document.getElementById('min-height');
-            const downloadSelectedBtn = document.getElementById('download-selected-btn');
-            const downloadAllBtn = document.getElementById('download-all-btn');
-            const modal = document.getElementById('image-modal');
-            const modalContent = document.getElementById('modal-content');
-            const modalImage = document.getElementById('modal-image');
-            const modalClose = document.querySelector('.modal-close');
-            const modalPrev = document.querySelector('.modal-prev');
-            const modalNext = document.querySelector('.modal-next');
+  <section class="footer-note">
+    <div><b>Notes & Limitations:</b> Extracts embedded images. JPEG is fully supported. PNG/raw (FlateDecode) support depends on PDF encoding; some advanced predictors or color spaces may be skipped. Thumbnails are scaled previews only—downloads are full-quality PNG.</div>
+  </section>
 
-            // --- State ---
-            let pdfFile = null;
-            let pdfFileName = '';
-            let extractedImages = [];
-            let visibleImages = [];
-            let activeObjectUrls = new Set();
-            let currentModalIndex = -1;
-            let imageObserver;
+</main>
 
-            // --- Theme Management ---
-            const applyTheme = (theme) => {
-                document.body.classList.toggle('dark-mode', theme === 'dark');
-                themeSwitcher.textContent = theme === 'dark' ? '☀️' : '🌙';
-            };
-            const currentTheme = localStorage.getItem('theme') || 'light';
-            applyTheme(currentTheme);
-            themeSwitcher.addEventListener('click', () => {
-                const newTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
-                localStorage.setItem('theme', newTheme);
-                applyTheme(newTheme);
-            });
+<script>
+/* =============================
+   Utility: Theme (Light/Dark)
+============================= */
+(function initTheme(){
+  const root = document.documentElement;
+  const toggle = document.getElementById('themeToggle');
+  const saved = localStorage.getItem('pdfimg_theme') || 'dark';
+  if(saved === 'light'){ root.classList.add('light'); toggle.checked = false; }
+  else { root.classList.remove('light'); toggle.checked = true; }
+  toggle.addEventListener('change', () => {
+    if(toggle.checked){ localStorage.setItem('pdfimg_theme','dark'); root.classList.remove('light'); }
+    else { localStorage.setItem('pdfimg_theme','light'); root.classList.add('light'); }
+  });
+})();
+</script>
 
-            // --- Debounce Utility for Filtering ---
-            function debounce(func, delay) {
-                let timeout;
-                return function(...args) {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(() => func.apply(this, args), delay);
-                };
-            }
+<script>
+/* ===========================================================
+   PDF Image Extractor (Single-file, Client-side, Offline)
+   Approach:
+   - Parse PDF bytes for image objects (/Subtype /Image)
+   - Extract stream and dictionary (Width, Height, Filter, ColorSpace)
+   - Supported filters:
+       * DCTDecode (JPEG)  -> decode via <img>, canvas to PNG
+       * JPXDecode (JPEG2000) -> best-effort (browser support varies)
+       * FlateDecode (raw) -> best-effort if 8bpc DeviceRGB/DeviceGray
+         with Predictor 1/absent using DecompressionStream if available
+   - Create PNGs via Canvas for consistent output
+   - Deduplicate via SHA-256 on resulting PNG bytes
+   - UI: thumbnails, metadata, sorting, selection, ZIP (store method)
+=========================================================== */
 
-            // --- Event Listeners ---
-            pdfFileInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
-            startBtn.addEventListener('click', processPDF);
-            resetBtn.addEventListener('click', resetApp);
-            selectAllCheckbox.addEventListener('change', handleSelectAll);
-            sortSizeBtn.addEventListener('click', () => sortAndRender('size'));
-            smartSortBtn.addEventListener('click', () => sortAndRender('smart'));
-            const debouncedFilter = debounce(applyFiltersAndRender, 300);
-            [minWidthInput, minHeightInput].forEach(input => input.addEventListener('input', debouncedFilter));
-            downloadSelectedBtn.addEventListener('click', () => downloadImagesAsZip(getSelectedImages()));
-            downloadAllBtn.addEventListener('click', () => downloadImagesAsZip(extractedImages));
-            imageGrid.addEventListener('change', (e) => { if (e.target.classList.contains('checkbox')) updateSelectionState(); });
-            imageGrid.addEventListener('click', handleGridClick);
-            
-            // Drag & Drop Listeners
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => uploadSection.addEventListener(eventName, preventDefaults, false));
-            ['dragenter', 'dragover'].forEach(eventName => uploadSection.addEventListener(eventName, () => uploadSection.classList.add('drag-over'), false));
-            ['dragleave', 'drop'].forEach(eventName => uploadSection.addEventListener(eventName, () => uploadSection.classList.remove('drag-over'), false));
-            uploadSection.addEventListener('drop', (e) => handleFileSelect(e.dataTransfer.files[0]), false);
-            function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+const els = {
+  fileInput: document.getElementById('fileInput'),
+  startBtn: document.getElementById('startBtn'),
+  selectAllBtn: document.getElementById('selectAllBtn'),
+  deselectAllBtn: document.getElementById('deselectAllBtn'),
+  defaultSortBtn: document.getElementById('defaultSortBtn'),
+  smartSortBtn: document.getElementById('smartSortBtn'),
+  downloadSelectedZipBtn: document.getElementById('downloadSelectedZipBtn'),
+  downloadAllZipBtn: document.getElementById('downloadAllZipBtn'),
+  gallery: document.getElementById('gallery'),
+  bar: document.getElementById('bar'),
+  progressText: document.getElementById('progressText'),
+  stats: document.getElementById('stats'),
+  pdfName: document.getElementById('pdfName'),
+};
 
-            // Modal Listeners
-            modalClose.onclick = closeModal;
-            modal.onclick = (e) => { if (e.target === modal) closeModal(); };
-            modalPrev.onclick = () => showModalImage(currentModalIndex - 1);
-            modalNext.onclick = () => showModalImage(currentModalIndex + 1);
-            document.addEventListener('keydown', (e) => {
-                if (modal.style.display === "block") {
-                    if (e.key === 'Escape') closeModal();
-                    if (e.key === 'ArrowLeft') showModalImage(currentModalIndex - 1);
-                    if (e.key === 'ArrowRight') showModalImage(currentModalIndex + 1);
-                }
-            });
-            
-            // Modal Swipe Gestures
-            let touchStartX = 0;
-            modalContent.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
-            modalContent.addEventListener('touchend', e => {
-                const touchEndX = e.changedTouches[0].screenX;
-                if (touchStartX - touchEndX > 50) showModalImage(currentModalIndex + 1); // Swipe Left
-                if (touchStartX - touchEndX < -50) showModalImage(currentModalIndex - 1); // Swipe Right
-            });
+let state = {
+  pdfFile: null,
+  pdfNameBase: 'images',
+  rawBytes: null,
+  images: [],     // { id, pngBlob, width, height, mb, name, hashHex, selected, srcObjectUrl }
+  removedDuplicates: 0,
+  sortMode: 'default', // 'default' or 'smart'
+};
 
-            // --- Core Functions ---
-            function handleFileSelect(file) {
-                if (file && file.type === 'application/pdf') {
-                    pdfFile = file;
-                    pdfFileName = file.name.replace(/\.pdf$/i, '');
-                    fileNameDisplay.textContent = `Selected: ${file.name}`;
-                    startBtn.disabled = false;
-                    resetBtn.style.display = 'inline-block';
-                    resetUI(false);
-                } else if (file) {
-                    alert('Please select a valid PDF file.');
-                }
-            }
+function sanitizeBaseName(name) {
+  const base = name.replace(/\.[Pp][Dd][Ff]$/, '');
+  let s = base.replace(/[^a-zA-Z0-9_\-]+/g, '_');
+  if (s.length > 12) s = s.slice(0, 12);
+  if (!s) s = 'images';
+  return s.toLowerCase();
+}
 
-            function resetApp() {
-                pdfFile = null;
-                pdfFileInput.value = '';
-                fileNameDisplay.textContent = '';
-                startBtn.disabled = true;
-                resetBtn.style.display = 'none';
-                resetUI(true);
-            }
+// File selection
+els.fileInput.addEventListener('change', () => {
+  const f = els.fileInput.files && els.fileInput.files[0];
+  if (!f) return;
+  state.pdfFile = f;
+  els.pdfName.textContent = f.name;
+  state.pdfNameBase = sanitizeBaseName(f.name);
+  els.startBtn.disabled = false;
+});
 
-            function resetUI(isFullReset) {
-                resultsSection.style.display = 'none';
-                processingSection.style.display = 'none';
-                statusMessage.style.display = 'none';
-                imageGrid.innerHTML = '';
-                if (imageObserver) imageObserver.disconnect();
-                activeObjectUrls.forEach(url => URL.revokeObjectURL(url));
-                activeObjectUrls.clear();
-                extractedImages = [];
-                visibleImages = [];
-                if (isFullReset) {
-                    uploadSection.style.display = 'block';
-                    postUploadControls.style.display = 'block';
-                }
-            }
+// Buttons
+els.startBtn.addEventListener('click', async () => {
+  if (!state.pdfFile) return;
+  resetUIForProcessing();
+  try {
+    state.rawBytes = await state.pdfFile.arrayBuffer();
+    updateProgress(0, 'Scanning PDF…');
+    const items = await extractImagesFromPDF(new Uint8Array(state.rawBytes));
+    // Convert & dedupe
+    if (items.length === 0) {
+      showEmpty('No images found in this PDF.');
+      finalizeStats();
+      return;
+    }
+    await convertAllToPNGAndDedup(items);
+    renderImages();
+    enablePostProcessButtons();
+    finalizeStats();
+  } catch (err) {
+    console.error(err);
+    showEmpty('Failed to process PDF (corrupt or unsupported).');
+    updateProgress(0, 'Error.');
+  }
+});
 
-            async function processPDF() {
-                if (!pdfFile) return;
-                resetUI(false);
-                uploadSection.style.display = 'none';
-                postUploadControls.style.display = 'none';
-                processingSection.style.display = 'block';
-                progressText.textContent = 'Reading PDF file...';
-                progressBar.style.width = '0%';
+els.selectAllBtn.addEventListener('click', () => {
+  for (const it of state.images) it.selected = true;
+  renderImages();
+});
+els.deselectAllBtn.addEventListener('click', () => {
+  for (const it of state.images) it.selected = false;
+  renderImages();
+});
 
-                try {
-                    const typedarray = new Uint8Array(await pdfFile.arrayBuffer());
-                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
-                    const numPages = pdf.numPages;
-                    let imageCounter = 1;
-                    const uniqueImageHashes = new Set();
+els.defaultSortBtn.addEventListener('click', () => {
+  state.sortMode = 'default';
+  sortImages();
+  renderImages();
+});
+els.smartSortBtn.addEventListener('click', () => {
+  state.sortMode = 'smart';
+  sortImages();
+  renderImages();
+});
 
-                    for (let i = 1; i <= numPages; i++) {
-                        progressText.textContent = `Processing page ${i}/${numPages}...`;
-                        const page = await pdf.getPage(i);
-                        const operatorList = await page.getOperatorList();
-                        
-                        for (let j = 0; j < operatorList.fnArray.length; j++) {
-                            if (operatorList.fnArray[j] === pdfjsLib.OPS.paintImageXObject) {
-                                const imgName = operatorList.argsArray[j][0];
-                                const img = await page.objs.get(imgName);
-                                if (!img || img.width <= 1 || img.height <= 1) continue;
+els.downloadSelectedZipBtn.addEventListener('click', async () => {
+  const chosen = state.images.filter(i => i.selected);
+  if (chosen.length === 0) {
+    alert('No images selected.');
+    return;
+  }
+  const zipBlob = await buildZipFromImages(chosen);
+  const a = document.createElement('a');
+  const zipName = `${state.pdfNameBase}_images.zip`;
+  a.href = URL.createObjectURL(zipBlob);
+  a.download = zipName;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  a.remove();
+});
 
-                                const hash = await generateHash(img.data);
-                                if (uniqueImageHashes.has(hash)) continue;
-                                uniqueImageHashes.add(hash);
+els.downloadAllZipBtn.addEventListener('click', async () => {
+  const chosen = state.images.slice();
+  if (chosen.length === 0) {
+    alert('Nothing to download.');
+    return;
+  }
+  const zipBlob = await buildZipFromImages(chosen);
+  const a = document.createElement('a');
+  const zipName = `${state.pdfNameBase}_images.zip`;
+  a.href = URL.createObjectURL(zipBlob);
+  a.download = zipName;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  a.remove();
+});
 
-                                const blob = await canvasToBlob(img);
-                                if (!blob) continue;
+// UI helpers
+function resetUIForProcessing(){
+  state.images = [];
+  state.removedDuplicates = 0;
+  state.sortMode = 'default';
+  els.gallery.innerHTML = '';
+  updateProgress(0, 'Preparing…');
+  els.defaultSortBtn.disabled = true;
+  els.smartSortBtn.disabled = true;
+  els.selectAllBtn.disabled = true;
+  els.deselectAllBtn.disabled = true;
+  els.downloadSelectedZipBtn.disabled = true;
+  els.downloadAllZipBtn.disabled = true;
+  els.stats.textContent = '';
+}
+function enablePostProcessButtons(){
+  els.defaultSortBtn.disabled = false;
+  els.smartSortBtn.disabled = false;
+  els.selectAllBtn.disabled = false;
+  els.deselectAllBtn.disabled = false;
+  els.downloadSelectedZipBtn.disabled = false;
+  els.downloadAllZipBtn.disabled = false;
+}
+function showEmpty(msg){
+  els.gallery.innerHTML = `<div class="empty">${msg}</div>`;
+}
+function updateProgress(pct, text){
+  els.bar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  els.progressText.textContent = text;
+}
+function finalizeStats(){
+  const n = state.images.length;
+  const dup = state.removedDuplicates;
+  els.stats.innerHTML = `Images: <b>${n}</b> &nbsp; | &nbsp; Removed duplicates: <b>${dup}</b>`;
+}
 
-                                const truncatedName = pdfFileName.length > 12 ? pdfFileName.substring(0, 12) : pdfFileName;
-                                extractedImages.push({
-                                    id: imageCounter, name: `${truncatedName}_img${imageCounter}.png`,
-                                    blob, width: img.width, height: img.height, size: blob.size, hash
-                                });
-                                imageCounter++;
-                            }
-                        }
-                        progressBar.style.width = `${(i / numPages) * 100}%`;
-                        await new Promise(resolve => setTimeout(resolve, 0)); // Yield to main thread
-                    }
+// Rendering
+function renderImages(){
+  // sort according to state.sortMode
+  sortImages();
+  if (state.images.length === 0) {
+    showEmpty('No images found after processing.');
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  for (const it of state.images) {
+    frag.appendChild(renderCard(it));
+  }
+  els.gallery.innerHTML = '';
+  els.gallery.appendChild(frag);
+}
+function renderCard(it){
+  const card = document.createElement('div');
+  card.className = 'card';
 
-                    processingSection.style.display = 'none';
-                    if (extractedImages.length > 0) {
-                        sortAndRender('size');
-                        resultsSection.style.display = 'block';
-                    } else {
-                        showStatusMessage('No images found in this PDF.');
-                    }
-                } catch (error) {
-                    console.error('Error processing PDF:', error);
-                    processingSection.style.display = 'none';
-                    let message = error.name === 'PasswordException' ? 'Error: This PDF is password-protected.' : `Error: ${error.message}`;
-                    showStatusMessage(message);
-                }
-            }
-            
-            async function canvasToBlob({ width, height, data, kind }) {
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                const imageData = ctx.createImageData(width, height);
-                
-                if (kind === pdfjsLib.ImageKind.RGBA_32BPP) {
-                    imageData.data.set(data);
-                } else if (kind === pdfjsLib.ImageKind.RGB_24BPP) {
-                    for (let i = 0, j = 0; i < data.length; i += 3, j += 4) {
-                        imageData.data[j] = data[i];
-                        imageData.data[j + 1] = data[i + 1];
-                        imageData.data[j + 2] = data[i + 2];
-                        imageData.data[j + 3] = 255;
-                    }
-                } else {
-                    for (let i = 0, j = 0; i < data.length; i++, j += 4) {
-                        imageData.data[j] = imageData.data[j + 1] = imageData.data[j + 2] = data[i];
-                        imageData.data[j + 3] = 255;
-                    }
-                }
-                ctx.putImageData(imageData, 0, 0);
-                return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-            }
+  const img = document.createElement('img');
+  img.className = 'thumb';
+  img.src = it.srcObjectUrl; // PNG blob preview (full PNG but scaled by CSS)
+  img.alt = it.name;
+  img.loading = 'lazy';
+  img.title = 'Click to open full-size in new tab';
+  img.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = it.srcObjectUrl;
+    a.target = '_blank';
+    a.download = it.name;
+    a.click();
+  });
+  card.appendChild(img);
 
-            function sortAndRender(type) {
-                if (type === 'size') extractedImages.sort((a, b) => b.size - a.size);
-                else if (type === 'smart') {
-                    const score = (img) => (img.width < 50 || img.height < 50) ? img.size * 0.01 : (img.width * img.height) + (img.size * 10);
-                    extractedImages.sort((a, b) => score(b) - score(a));
-                }
-                applyFiltersAndRender();
-            }
+  const meta = document.createElement('div');
+  meta.className = 'meta';
 
-            function applyFiltersAndRender() {
-                const minW = parseInt(minWidthInput.value) || 0;
-                const minH = parseInt(minHeightInput.value) || 0;
-                visibleImages = extractedImages.filter(img => img.width >= minW && img.height >= minH);
-                renderImages();
-            }
+  // top row: checkbox + filename badge
+  const row1 = document.createElement('div');
+  row1.className = 'row';
 
-            function renderImages() {
-                if (imageObserver) imageObserver.disconnect();
-                activeObjectUrls.forEach(url => URL.revokeObjectURL(url));
-                activeObjectUrls.clear();
-                
-                imageGrid.innerHTML = visibleImages.map(img => `
-                    <div class="image-card" data-id="${img.id}">
-                        <input type="checkbox" class="checkbox" data-id="${img.id}">
-                        <a class="thumbnail-link" title="Click to view full size">
-                            <img data-src-id="${img.id}" alt="${img.name}">
-                        </a>
-                        <div class="info">
-                            <p><strong>${img.name}</strong></p>
-                            <p>${img.width}×${img.height}px</p>
-                            <p>${(img.size / 1048576).toFixed(3)}MB</p>
-                        </div>
-                        <button class="download-btn" data-id="${img.id}" title="Download">&#x2193;</button>
-                    </div>
-                `).join('');
-                
-                setupLazyLoader();
-                updateSelectionState();
-                downloadAllBtn.disabled = extractedImages.length === 0;
-            }
+  const label = document.createElement('label');
+  label.style.display = 'flex';
+  label.style.alignItems = 'center';
+  label.style.gap = '8px';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = !!it.selected;
+  cb.addEventListener('change', () => it.selected = cb.checked);
+  const bname = document.createElement('span');
+  bname.className = 'badge';
+  bname.textContent = it.name;
+  label.appendChild(cb);
+  label.appendChild(bname);
 
-            function setupLazyLoader() {
-                imageObserver = new IntersectionObserver((entries, observer) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            const imgElement = entry.target;
-                            const imgId = parseInt(imgElement.dataset.srcId);
-                            const image = extractedImages.find(i => i.id === imgId);
-                            if (image) {
-                                const url = URL.createObjectURL(image.blob);
-                                activeObjectUrls.add(url);
-                                imgElement.src = url;
-                                imgElement.onload = () => imgElement.classList.add('loaded');
-                            }
-                            observer.unobserve(imgElement);
-                        }
-                    });
-                }, { rootMargin: "0px 0px 200px 0px" }); // Pre-load images 200px before they enter viewport
-                document.querySelectorAll('img[data-src-id]').forEach(img => imageObserver.observe(img));
-            }
+  // individual download
+  const dlBtn = document.createElement('button');
+  dlBtn.textContent = 'Download';
+  dlBtn.style.padding = '6px 10px';
+  dlBtn.addEventListener('click', async () => {
+    const a = document.createElement('a');
+    a.href = it.srcObjectUrl;
+    a.download = it.name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    a.remove();
+  });
 
-            function updateSelectionState() {
-                const selected = getSelectedImages();
-                const count = selected.length;
-                selectedCountDisplay.textContent = `${count} selected`;
-                downloadSelectedBtn.disabled = count === 0;
-                downloadSelectedBtn.textContent = count > 0 ? `Download ${count} Selected` : 'Download Selected';
-                selectAllCheckbox.checked = count > 0 && count === visibleImages.length;
-            }
+  row1.appendChild(label);
+  row1.appendChild(dlBtn);
+  meta.appendChild(row1);
 
-            function handleSelectAll() {
-                document.querySelectorAll('.image-card .checkbox').forEach(cb => cb.checked = selectAllCheckbox.checked);
-                updateSelectionState();
-            }
+  // row2: dims + size
+  const row2 = document.createElement('div');
+  row2.className = 'row';
+  const dims = document.createElement('div'); dims.className = 'small';
+  dims.textContent = `Dimensions: ${it.width}×${it.height}px`;
+  const size = document.createElement('div'); size.className = 'small';
+  size.textContent = `Size: ${it.mb.toFixed(2)} MB`;
+  row2.appendChild(dims);
+  row2.appendChild(size);
+  meta.appendChild(row2);
 
-            function getSelectedImages() {
-                const selectedIds = Array.from(document.querySelectorAll('.image-card .checkbox:checked')).map(cb => parseInt(cb.dataset.id));
-                return extractedImages.filter(img => selectedIds.includes(img.id));
-            }
+  // selection state line
+  const sel = document.createElement('div');
+  sel.className = 'small';
+  sel.innerHTML = it.selected ? `<span class="ok">Selected</span>` : `Not selected`;
+  cb.addEventListener('change', ()=>{ sel.innerHTML = cb.checked ? `<span class="ok">Selected</span>` : `Not selected`; });
+  meta.appendChild(sel);
 
-            async function downloadImagesAsZip(imagesToDownload) {
-                if (imagesToDownload.length === 0) return;
-                const zip = new JSZip();
-                imagesToDownload.forEach(img => zip.file(img.name, img.blob));
-                const content = await zip.generateAsync({ type: 'blob' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(content);
-                link.download = `${pdfFileName}_images.zip`;
-                link.click();
-                URL.revokeObjectURL(link.href);
-            }
+  card.appendChild(meta);
+  return card;
+}
 
-            function handleGridClick(e) {
-                const card = e.target.closest('.image-card');
-                if (!card) return;
-                const id = parseInt(card.dataset.id);
-                if (e.target.classList.contains('download-btn')) {
-                    const image = extractedImages.find(img => img.id === id);
-                    if (image) downloadSingleImage(image);
-                } else if (e.target.closest('.thumbnail-link')) {
-                    openModal(id);
-                }
-            }
+function sortImages(){
+  const arr = state.images;
+  if (arr.length === 0) return;
+  if (state.sortMode === 'default') {
+    arr.sort((a,b) => (b.width*b.height) - (a.width*a.height));
+  } else {
+    // Smart sort: blend area and MB vs average -> larger score first
+    const areas = arr.map(i => i.width*i.height);
+    const sizes = arr.map(i => i.mb);
+    const avgA = (areas.reduce((s,v)=>s+v,0) / areas.length) || 1;
+    const avgS = (sizes.reduce((s,v)=>s+v,0) / sizes.length) || 1;
+    for (const it of arr) {
+      const area = it.width*it.height;
+      const wArea = area / avgA;
+      const wSize = it.mb / avgS;
+      it._smartScore = 0.6*wArea + 0.4*wSize; // weight area more than size
+    }
+    arr.sort((a,b) => (b._smartScore - a._smartScore));
+  }
+}
 
-            function downloadSingleImage(image) {
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(image.blob);
-                link.download = image.name;
-                link.click();
-                URL.revokeObjectURL(link.href);
-            }
+/* ============================
+   PDF Parsing & Extraction
+============================ */
 
-            function openModal(imageId) {
-                currentModalIndex = visibleImages.findIndex(img => img.id === imageId);
-                if (currentModalIndex === -1) return;
-                showModalImage(currentModalIndex);
-                modal.style.display = "block";
-            }
+async function extractImagesFromPDF(u8){
+  // We decode whole file to a Latin1 string (1:1 bytes mapping) for robust token search.
+  const text = new TextDecoder('latin1').decode(u8);
+  const reObj = /(\d+)\s+(\d+)\s+obj([\s\S]*?)endobj/g;
+  let m;
+  const items = [];
+  let objIndex = 0;
+  while ((m = reObj.exec(text)) !== null) {
+    objIndex++;
+    const objContent = m[3];
+    if (!/\/Subtype\s*\/Image/.test(objContent)) continue;
+    const dictAndStream = objContent;
+    const dictMatch = /<<(.*?)>>/s.exec(dictAndStream);
+    if (!dictMatch) continue;
+    const dictStr = dictMatch[1];
 
-            function showModalImage(index) {
-                if (index < 0 || index >= visibleImages.length) return;
-                currentModalIndex = index;
-                const image = visibleImages[index];
-                const url = URL.createObjectURL(image.blob);
-                if (modalImage.dataset.url) URL.revokeObjectURL(modalImage.dataset.url);
-                modalImage.src = url;
-                modalImage.dataset.url = url;
-                modalPrev.style.display = index > 0 ? 'block' : 'none';
-                modalNext.style.display = index < visibleImages.length - 1 ? 'block' : 'none';
-            }
+    const width = pickInt(dictStr, /\/Width\s+(\d+)/);
+    const height = pickInt(dictStr, /\/Height\s+(\d+)/);
+    const bits = pickInt(dictStr, /\/BitsPerComponent\s+(\d+)/) || 8;
+    const cs = pickName(dictStr, /\/ColorSpace\s+\/([A-Za-z0-9]+)/) || 'DeviceRGB';
 
-            function closeModal() {
-                modal.style.display = "none";
-                if (modalImage.dataset.url) URL.revokeObjectURL(modalImage.dataset.url);
-                modalImage.src = "";
-                modalImage.removeAttribute('data-url');
-            }
+    // Filter can be a name or an array
+    let filter = pickName(dictStr, /\/Filter\s+\/([A-Za-z0-9]+)/) || null;
+    const filterArr = pickArrayNames(dictStr, /\/Filter\s+\[([^\]]+)\]/);
+    if (!filter && filterArr.length) filter = filterArr[0];
+    const predictor = pickInt(dictStr, /\/DecodeParms[\s\S]*?\/Predictor\s+(\d+)/) || 1;
 
-            function showStatusMessage(message) {
-                statusMessage.textContent = message;
-                statusMessage.style.display = 'block';
-                resetBtn.style.display = 'inline-block';
-            }
+    // Locate "stream" ..."endstream" (Latin1 safe)
+    const streamStart = dictAndStream.indexOf('stream', dictStr.length);
+    const streamEnd = dictAndStream.indexOf('endstream', streamStart);
+    if (streamStart === -1 || streamEnd === -1) continue;
 
-            async function generateHash(data) {
-                const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-                return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-            }
-        });
-    </script>
+    // Account for EOL after stream
+    let dataStartInObj = streamStart + 'stream'.length;
+    if (dictAndStream[dataStartInObj] === '\r' && dictAndStream[dataStartInObj+1] === '\n') dataStartInObj += 2;
+    else if (dictAndStream[dataStartInObj] === '\n') dataStartInObj += 1;
+
+    const objStartInFile = m.index; // offset in full text
+    const start = objStartInFile + dataStartInObj;
+    const end = objStartInFile + streamEnd;
+
+    // Slice bytes
+    const bytes = u8.subarray(start, end);
+
+    items.push({
+      index: items.length + 1,
+      width, height, bits, cs, filter, predictor,
+      bytes
+    });
+  }
+  return items;
+}
+
+function pickInt(s, re){
+  const m = re.exec(s);
+  return m ? parseInt(m[1],10) : null;
+}
+function pickName(s, re){
+  const m = re.exec(s); return m ? m[1] : null;
+}
+function pickArrayNames(s, re){
+  const m = re.exec(s);
+  if(!m) return [];
+  const inner = m[1];
+  return (inner.match(/\/([A-Za-z0-9]+)/g) || []).map(t => t.slice(1));
+}
+
+/* =======================================
+   Convert to PNG & Deduplicate by SHA256
+======================================= */
+async function convertAllToPNGAndDedup(items){
+  // We'll convert sequentially to avoid memory spikes
+  const total = items.length;
+  let done = 0;
+
+  const seen = new Set();
+  const results = [];
+  const base = state.pdfNameBase;
+
+  for (let i=0;i<total;i++){
+    const it = items[i];
+    updateProgress(Math.round(((i)/total)*100), `Processing image ${i+1}/${total}…`);
+
+    try {
+      const pngBlob = await convertOneToPNG(it);
+      if (!pngBlob) continue;
+
+      const ab = await pngBlob.arrayBuffer();
+      const hash = await sha256Hex(new Uint8Array(ab));
+      if (seen.has(hash)) {
+        state.removedDuplicates += 1;
+        continue;
+      }
+      seen.add(hash);
+
+      // Confirm real dimensions via decoded PNG (create Image)
+      const url = URL.createObjectURL(pngBlob);
+      const { w:realW, h:realH } = await probeImageSize(url, it.width, it.height);
+
+      const name = `${base}_img${results.length+1}.png`;
+      results.push({
+        id: 'img'+(results.length+1),
+        pngBlob, hashHex: hash,
+        width: realW, height: realH,
+        mb: ab.byteLength/(1024*1024),
+        name,
+        selected: false,
+        srcObjectUrl: url
+      });
+    } catch (e) {
+      console.warn('Skipping an image due to error', e);
+    }
+    done++;
+    updateProgress(Math.round((done/total)*100), `Processing image ${Math.min(done,total)}/${total}…`);
+  }
+  state.images = results;
+}
+
+/* Convert a single PDF image object to PNG Blob */
+async function convertOneToPNG(item){
+  const { bytes, filter, width, height, bits, cs, predictor } = item;
+  // JPEG (DCTDecode)
+  if (/^DCTDecode$/i.test(filter)) {
+    const jpegBlob = new Blob([bytes], { type: 'image/jpeg' });
+    const { canvas, ctx, img } = await drawToCanvas(jpegBlob, width, height);
+    const png = await canvasToPNG(canvas);
+    cleanupCanvas(canvas, ctx, img);
+    return png;
+  }
+  // JPEG2000 (best-effort)
+  if (/^JPXDecode$/i.test(filter)) {
+    const jpxBlob = new Blob([bytes], { type: 'image/jp2' });
+    try {
+      const { canvas, ctx, img } = await drawToCanvas(jpxBlob, width, height);
+      const png = await canvasToPNG(canvas);
+      cleanupCanvas(canvas, ctx, img);
+      return png;
+    } catch {
+      // Some browsers don't support JP2
+      console.warn('JPEG2000 not supported by this browser.');
+      return null;
+    }
+  }
+  // FlateDecode raw raster (basic support)
+  if (/^FlateDecode$/i.test(filter)) {
+    // Only handle simple DeviceRGB/DeviceGray with 8 bits and Predictor 1 (or missing)
+    if (!((bits===8) && (cs==='DeviceRGB' || cs==='DeviceGray') && (predictor===1))) {
+      console.warn('Skipping FlateDecode image (unsupported color space/predictor/bpc).');
+      return null;
+    }
+    let raw;
+    try {
+      raw = await inflateZlib(bytes);
+    } catch (e) {
+      console.warn('Flate inflate failed: ', e);
+      return null;
+    }
+    // Expected length checks: gray = W*H; rgb = W*H*3
+    const expected = (cs==='DeviceRGB') ? width*height*3 : width*height;
+    if (raw.length !== expected) {
+      // Some PDFs include per-row padding or filters not accounted for
+      console.warn('Flate raw length mismatch; skipping.');
+      return null;
+    }
+    // Build ImageData
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: false });
+    const imgData = ctx.createImageData(width, height);
+    if (cs==='DeviceRGB') {
+      const src = raw; const dst = imgData.data;
+      let si=0, di=0;
+      for (let i=0;i<width*height;i++){
+        dst[di++] = src[si++]; // R
+        dst[di++] = src[si++]; // G
+        dst[di++] = src[si++]; // B
+        dst[di++] = 255;       // A
+      }
+    } else {
+      const src = raw; const dst = imgData.data;
+      let si=0, di=0;
+      for (let i=0;i<width*height;i++){
+        const v = src[si++];
+        dst[di++] = v; dst[di++] = v; dst[di++] = v; dst[di++] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    const png = await canvasToPNG(canvas);
+    return png;
+  }
+
+  console.warn('Unsupported filter: ', filter);
+  return null;
+}
+
+/* Draw a blob image to canvas at its intrinsic size or provided hints */
+function drawToCanvas(blob, hintW, hintH){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const w = hintW || img.naturalWidth || img.width;
+      const h = hintH || img.naturalHeight || img.height;
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d', { alpha: true });
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve({ canvas, ctx, img });
+    };
+    img.onerror = () => reject(new Error('Image decode failed'));
+    img.src = URL.createObjectURL(blob);
+  });
+}
+function canvasToPNG(canvas){
+  return new Promise((resolve) => {
+    canvas.toBlob(b => resolve(b), 'image/png', 1.0);
+  });
+}
+function cleanupCanvas(canvas, ctx, img){
+  try { URL.revokeObjectURL(img.src); } catch {}
+}
+
+/* Probe image size from Blob URL */
+function probeImageSize(url, fallbackW, fallbackH){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth || fallbackW || 0;
+      const h = img.naturalHeight || fallbackH || 0;
+      URL.revokeObjectURL(url);
+      // re-create url (we revoked it; caller will create a new one before rendering)
+      const nurl = URL.createObjectURL(new Blob([/*empty*/]));
+      URL.revokeObjectURL(nurl); // placeholder; not needed actually
+      resolve({ w, h });
+    };
+    img.onerror = () => resolve({ w: fallbackW||0, h: fallbackH||0 });
+    img.src = url;
+  });
+}
+
+/* Inflate zlib using DecompressionStream if available (no external libs) */
+async function inflateZlib(u8){
+  if ('DecompressionStream' in window) {
+    const ds = new DecompressionStream('deflate');
+    const inStream = new Response(new Blob([u8])).body;
+    const outStream = inStream.pipeThrough(ds);
+    const out = await new Response(outStream).arrayBuffer();
+    return new Uint8Array(out);
+  } else {
+    // Minimal fallback: no inflate available
+    throw new Error('DecompressionStream not supported in this browser.');
+  }
+}
+
+/* SHA-256 (WebCrypto) */
+async function sha256Hex(u8){
+  const buf = await crypto.subtle.digest('SHA-256', u8);
+  const arr = Array.from(new Uint8Array(buf));
+  return arr.map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ===================
+   ZIP (store method)
+   Build a .zip without compression for selected images
+   Spec: local file header + file data + central dir + EOCD
+=================== */
+
+// CRC32
+const CRC32_TABLE = (() => {
+  let c, table = [];
+  for (let n =0; n < 256; n++) {
+    c = n;
+    for (let k=0; k<8; k++) {
+      c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+function crc32(u8){
+  let c = 0 ^ (-1);
+  for (let i=0;i<u8.length;i++){
+    c = (c >>> 0);
+    c = (c >>> 8) ^ CRC32_TABLE[(c ^ u8[i]) & 0xFF];
+  }
+  return (c ^ (-1)) >>> 0;
+}
+
+function strToU8(s){
+  const u = new Uint8Array(s.length);
+  for (let i=0;i<s.length;i++) u[i] = s.charCodeAt(i) & 0xFF;
+  return u;
+}
+function writeUint16LE(v){ return new Uint8Array([v & 0xFF, (v>>8) & 0xFF]); }
+function writeUint32LE(v){
+  return new Uint8Array([v & 0xFF, (v>>8)&0xFF, (v>>16)&0xFF, (v>>24)&0xFF]);
+}
+
+async function buildZipFromImages(files){
+  // files: [{name, pngBlob}]
+  const fileRecords = [];
+  let localOffset = 0;
+  const localParts = [];
+
+  const now = new Date();
+  const dosTime = toDosTime(now);
+  const dosDate = toDosDate(now);
+
+  for (const f of files) {
+    const ab = await f.pngBlob.arrayBuffer();
+    const u8 = new Uint8Array(ab);
+    const c = crc32(u8);
+    const nameU8 = strToU8(f.name);
+
+    // Local file header
+    const LFH = [
+      writeUint32LE(0x04034b50),       // signature
+      writeUint16LE(20),               // version needed
+      writeUint16LE(0),                // general purpose bit
+      writeUint16LE(0),                // compression (0 = store)
+      writeUint16LE(dosTime),          // mod time
+      writeUint16LE(dosDate),          // mod date
+      writeUint32LE(c),                // CRC32
+      writeUint32LE(u8.length),        // compressed size
+      writeUint32LE(u8.length),        // uncompressed size
+      writeUint16LE(nameU8.length),    // filename length
+      writeUint16LE(0),                // extra length
+      nameU8,
+      u8
+    ];
+
+    const lfhSize = LFH.reduce((s,part)=> s + part.length, 0);
+    localParts.push(...LFH);
+
+    fileRecords.push({
+      nameU8,
+      crc: c,
+      size: u8.length,
+      compSize: u8.length,
+      offset: localOffset,
+      time: dosTime,
+      date: dosDate
+    });
+    localOffset += lfhSize;
+  }
+
+  // Central Directory
+  const cdParts = [];
+  let cdSize = 0;
+  for (const rec of fileRecords) {
+    const CDFH = [
+      writeUint32LE(0x02014b50),
+      writeUint16LE(20),               // version made by
+      writeUint16LE(20),               // version needed
+      writeUint16LE(0),                // general bit
+      writeUint16LE(0),                // compression
+      writeUint16LE(rec.time),
+      writeUint16LE(rec.date),
+      writeUint32LE(rec.crc),
+      writeUint32LE(rec.compSize),
+      writeUint32LE(rec.size),
+      writeUint16LE(rec.nameU8.length),
+      writeUint16LE(0),                // extra
+      writeUint16LE(0),                // comment
+      writeUint16LE(0),                // disk number start
+      writeUint16LE(0),                // internal attrs
+      writeUint32LE(0),                // external attrs
+      writeUint32LE(rec.offset),
+      rec.nameU8
+    ];
+    const size = CDFH.reduce((s, part)=> s + part.length, 0);
+    cdSize += size;
+    cdParts.push(...CDFH);
+  }
+
+  const cdOffset = localOffset;
+
+  const EOCD = [
+    writeUint32LE(0x06054b50),
+    writeUint16LE(0), writeUint16LE(0),                 // disk numbers
+    writeUint16LE(fileRecords.length),                  // entries on this disk
+    writeUint16LE(fileRecords.length),                  // total entries
+    writeUint32LE(cdSize),
+    writeUint32LE(cdOffset),
+    writeUint16LE(0)                                    // comment length
+  ];
+
+  const totalSize = localOffset + cdSize + EOCD.reduce((s,part)=> s+part.length, 0);
+  const out = new Uint8Array(totalSize);
+  let pos = 0;
+  for (const p of localParts) { out.set(p, pos); pos += p.length; }
+  for (const p of cdParts)    { out.set(p, pos); pos += p.length; }
+  for (const p of EOCD)       { out.set(p, pos); pos += p.length; }
+
+  return new Blob([out], { type: 'application/zip' });
+}
+
+function toDosTime(d){
+  let h = d.getHours();
+  let m = d.getMinutes();
+  let s = Math.floor(d.getSeconds()/2);
+  return (h<<11) | (m<<5) | s;
+}
+function toDosDate(d){
+  let year = d.getFullYear();
+  if (year < 1980) year = 1980;
+  let y = year - 1980;
+  let mon = d.getMonth()+1;
+  let day = d.getDate();
+  return (y<<9) | (mon<<5) | day;
+}
+
+</script>
 </body>
 </html>
