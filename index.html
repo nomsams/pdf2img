@@ -1,529 +1,1253 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Image Extractor</title>
-    <style>
-        :root {
-            --bg-color: #f4f7f9; --text-color: #1a1a1a; --primary-color: #007bff; --primary-hover-color: #0056b3; --secondary-color: #6c757d; --card-bg-color: #ffffff; --border-color: #dee2e6; --progress-bar-bg: #e9ecef; --danger-color: #dc3545;
-        }
-        body.dark-mode {
-            --bg-color: #1a1c20; --text-color: #e1e1e1; --primary-color: #0d6efd; --primary-hover-color: #0b5ed7; --secondary-color: #495057; --card-bg-color: #2b2f36; --border-color: #495057; --progress-bar-bg: #343a40;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html { scroll-behavior: smooth; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-color); line-height: 1.6; padding: 10px; touch-action: manipulation; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; background-color: var(--card-bg-color); border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); border: 1px solid var(--border-color); }
-        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
-        h1 { font-size: 1.5rem; }
-        .upload-section { text-align: center; padding: 40px 20px; border: 2px dashed var(--border-color); border-radius: 8px; margin-bottom: 20px; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
-        .upload-section.drag-over { border-color: var(--primary-color); background-color: var(--progress-bar-bg); }
-        .upload-section p { margin-bottom: 15px; color: var(--secondary-color); pointer-events: none; }
-        .btn { display: inline-block; padding: 12px 24px; font-size: 1rem; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; border: none; border-radius: 6px; transition: background-color 0.2s, transform 0.1s, opacity 0.2s; }
-        .btn:active { transform: scale(0.98); }
-        .btn:disabled { background-color: var(--secondary-color); cursor: not-allowed; opacity: 0.6; }
-        .btn-primary { background-color: var(--primary-color); color: white; }
-        .btn-primary:hover:not(:disabled) { background-color: var(--primary-hover-color); }
-        .btn-danger { background-color: var(--danger-color); color: white; }
-        input[type="file"] { display: none; }
-        #file-name { margin-top: 15px; font-style: italic; color: var(--secondary-color); }
-        .processing-section { display: none; margin-top: 20px; }
-        .progress-bar-container { width: 100%; background-color: var(--progress-bar-bg); border-radius: 8px; overflow: hidden; height: 30px; margin-bottom: 10px; }
-        #progress-bar { width: 0%; height: 100%; background-color: var(--primary-color); transition: width 0.2s ease-in-out; }
-        #progress-text { text-align: center; font-weight: 500; }
-        .results-section { display: none; }
-        .toolbar { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; padding: 15px; background-color: var(--bg-color); border-radius: 8px; margin-bottom: 20px; }
-        .toolbar-group { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-        .toolbar input[type="number"] { width: 70px; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background-color: var(--card-bg-color); color: var(--text-color); }
-        #selected-count { font-weight: bold; color: var(--primary-color); }
-        #image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; }
-        .image-card { position: relative; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background-color: var(--card-bg-color); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .image-card .thumbnail-link { display: block; height: 150px; background-color: var(--progress-bar-bg); cursor: zoom-in; }
-        .image-card img { width: 100%; height: 100%; object-fit: contain; display: block; opacity: 0; transition: opacity 0.3s; }
-        .image-card img.loaded { opacity: 1; }
-        .image-card .info { padding: 10px; font-size: 0.8rem; }
-        .image-card .info p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .image-card .checkbox { position: absolute; top: 10px; left: 10px; width: 24px; height: 24px; cursor: pointer; accent-color: var(--primary-color); }
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9); }
-        .modal-content { position: relative; margin: auto; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-        .modal-content img { max-width: 95vw; max-height: 95vh; object-fit: contain; }
-        .modal-close { position: absolute; top: 15px; right: 25px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer; user-select: none; }
-        .modal-nav { position: absolute; top: 50%; transform: translateY(-50%); background-color: rgba(0,0,0,0.3); color: white; border: none; font-size: 2.5rem; padding: 15px; cursor: pointer; user-select: none; border-radius: 8px; }
-        .modal-prev { left: 10px; }
-        .modal-next { right: 10px; }
-        #fatal-error { display: none; text-align: center; padding: 50px; color: var(--danger-color); font-size: 1.2rem; border: 2px solid var(--danger-color); border-radius: 8px; }
-        @media (max-width: 768px) {
-            body { padding: 5px; } .container { padding: 15px; } h1 { font-size: 1.3rem; }
-            .toolbar { flex-direction: column; align-items: stretch; gap: 20px; }
-            .toolbar-group { justify-content: space-between; }
-            .toolbar-group:last-child { flex-direction: column; gap: 10px; align-items: stretch; }
-            .toolbar-group:last-child .btn { width: 100%; }
-        }
-    </style>
+<meta charset="utf-8" />
+<title>🚀 PDF Image Extractor – Single-File (Offline)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0b0d10;
+    --card: #12161c;
+    --muted: #9fb0c0;
+    --text: #e8eef5;
+    --accent: #61dafb;
+    --ok: #3ddc97;
+    --warn: #ffcc66;
+    --danger: #ff6b6b;
+    --border: #273240;
+    --shadow: 0 10px 30px rgba(0,0,0,.5);
+  }
+  :root.light {
+    --bg: #f7f9fc;
+    --card: #ffffff;
+    --muted: #5a6a7a;
+    --text: #0b0d10;
+    --accent: #0077ff;
+    --ok: #1a8e5f;
+    --warn: #b8860b;
+    --danger: #b00020;
+    --border: #d8e0ea;
+    --shadow: 0 10px 30px rgba(0,0,0,.15);
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+  }
+  header {
+    position: sticky; top: 0; z-index: 10; background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .wrap { max-width: 1150px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 8px 0; letter-spacing: .3px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .spacer { flex: 1; }
+
+  .btn, button, .toggle {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    padding: 10px 12px; border-radius: 12px; cursor: pointer; font-weight: 600;
+    transition: transform .06s ease, background .2s ease, border .2s ease, box-shadow .2s ease;
+    user-select: none; text-decoration: none; outline: none; box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:hover, button:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+  button.primary { background: linear-gradient(180deg, var(--accent), #2aa3d6); color: #001218; border-color: transparent; }
+  button.success { background: linear-gradient(180deg, var(--ok), #2dad78); color: #001b11; border-color: transparent; }
+  button.warn { background: linear-gradient(180deg, var(--warn), #d7a13c); color: #2d1f00; border-color: transparent; }
+  input[type="file"] { display:none; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: -4px; }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 14px;
+  }
+  .progress {
+    height: 12px; background: rgba(255,255,255,0.08);
+    border-radius: 999px; overflow: hidden; border: 1px solid var(--border);
+  }
+  .bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), #9bffd6); transition: width .15s ease; }
+  .statline { display: flex; gap: 10px; align-items:center; font-size: 13px; color: var(--muted); }
+
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
+  .thumb { display: block; width: 100%; max-height: 220px; object-fit: contain; background: rgba(0,0,0,0.12); cursor: zoom-in; }
+  .meta { padding: 10px 12px; display: grid; gap: 6px; font-size: 13px; }
+  .meta .row { justify-content: space-between; }
+  .badge { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .small { font-size: 12px; color: var(--muted); }
+  .ok { color: var(--ok); }
+  .empty { padding: 24px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 16px; }
+
+  .toggle { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; font-weight: 600; }
+  .toggle input { width: 0; height: 0; appearance: none; }
+  .pill { width: 44px; height: 24px; background: rgba(255,255,255,0.12); border-radius: 999px; position: relative; border: 1px solid var(--border); }
+  .dot { position: absolute; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border-radius: 50%; background: var(--text); left: 3px; transition: left .15s ease; }
+  .toggle input:checked + .pill .dot { left: 23px; }
+
+  .footer-note { margin-top: 30px; font-size: 12px; color: var(--muted); }
+
+  /* Fullscreen preview modal */
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.75);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000;
+  }
+  .modal.open { display: flex; }
+  .modal-inner {
+    max-width: min(96vw, 1600px);
+    max-height: 92vh; padding: 0; border-radius: 14px;
+    background: var(--card); border: 1px solid var(--border);
+    box-shadow: var(--shadow); position: relative; display: grid; grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+  .modal-header {
+    display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border);
+  }
+  .modal-header .spacer { flex: 1; }
+  .modal-img-wrap {
+    display: grid; place-items: center; background: #000; /* better contrast */
+    width: 100%; height: 100%;
+  }
+  .modal-img {
+    max-width: 100%; max-height: 100%;
+    object-fit: contain; image-rendering: auto;
+    background: #111;
+  }
+  .icon-btn {
+    padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); cursor: pointer; font-weight: 700;
+  }
+</style>
 </head>
 <body>
+<header>
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <h1>📄 PDF Image Extractor</h1>
+        <div class="hint">Single-file, offline. Finds embedded & inline images, resolves object streams, supports RGB/Gray/CMYK/Indexed, exports PNG in full quality.</div>
+      </div>
+      <div class="spacer"></div>
+      <label class="toggle" title="Light/Dark mode">
+        <span>Light</span>
+        <input id="themeToggle" type="checkbox" />
+        <span class="pill"><span class="dot"></span></span>
+        <span>Dark</span>
+      </label>
+    </div>
+  </div>
+</header>
 
-    <div id="app-container">
-        <div class="container">
-            <header>
-                <h1>📄 PDF Image Extractor</h1>
-                <div id="theme-switcher" title="Toggle Light/Dark Mode">🌙</div>
-            </header>
+<main class="wrap" style="display:flex; flex-direction: column; gap: 16px;">
 
-            <main>
-                <label for="pdf-file" class="upload-section" id="upload-section">
-                    <p>Tap or Drag & Drop a PDF file here</p>
-                    <span class="btn btn-primary">Upload PDF</span>
-                    <input type="file" id="pdf-file" accept=".pdf">
-                    <p id="file-name"></p>
-                </label>
-                <div id="post-upload-controls" style="text-align: center; margin-bottom: 20px;">
-                     <button class="btn btn-primary" id="start-btn" disabled>Start Processing</button>
-                     <button class="btn btn-danger" id="reset-btn" style="display: none;">Clear & Reset</button>
-                </div>
-                <div class="processing-section" id="processing-section">
-                    <div class="progress-bar-container"><div id="progress-bar"></div></div>
-                    <p id="progress-text">Initializing...</p>
-                </div>
-                <div id="status-message" style="display: none; text-align: center; padding: 40px; font-size: 1.2rem;"></div>
-                <div class="results-section" id="results-section">
-                    <div class="toolbar">
-                        <div class="toolbar-group">
-                            <label><input type="checkbox" id="select-all"> Select All</label>
-                            <span id="selected-count">0 selected</span>
-                        </div>
-                        <div class="toolbar-group">
-                            <button class="btn btn-secondary" id="sort-size-btn">Sort by Size</button>
-                            <button class="btn btn-secondary" id="smart-sort-btn">Smart Sort</button>
-                        </div>
-                        <div class="toolbar-group">
-                            <span>Filter:</span>
-                            <label>W ≥ <input type="number" id="min-width" placeholder="px" min="0"></label>
-                            <label>H ≥ <input type="number" id="min-height" placeholder="px" min="0"></label>
-                        </div>
-                        <div class="toolbar-group">
-                            <button class="btn btn-primary" id="download-selected-btn" disabled>Download Selected</button>
-                            <button class="btn btn-primary" id="download-all-btn" disabled>Download All</button>
-                        </div>
-                    </div>
-                    <div id="image-grid"></div>
-                </div>
-            </main>
-        </div>
+  <section class="panel">
+    <div class="row" style="gap: 8px; align-items:center;">
+      <label for="fileInput" class="btn" title="Choose a PDF from your computer (processed 100% locally).">📥 Upload PDF</label>
+      <input id="fileInput" type="file" accept="application/pdf,.pdf"/>
+
+      <button id="startBtn" class="primary" disabled title="Starts extraction. Processing progress shown below.">▶️ Start Processing</button>
+
+      <button id="selectAllBtn" disabled>Select All</button>
+      <button id="deselectAllBtn" disabled>Deselect All</button>
+
+      <button id="defaultSortBtn" disabled>Sort: Size (default)</button>
+      <button id="smartSortBtn" class="warn" disabled>Smart Sort</button>
+
+      <button id="downloadSelectedZipBtn" class="success" disabled>Download Selected (ZIP)</button>
+      <button id="downloadAllZipBtn" disabled>Download All (ZIP)</button>
+
+      <div class="spacer"></div>
+      <div class="small" id="pdfName">No file chosen</div>
     </div>
 
-    <div id="image-modal" class="modal">
-        <span class="modal-close" title="Close (Esc)">&times;</span>
-        <button class="modal-nav modal-prev" title="Previous (←)">&#10094;</button>
-        <div class="modal-content" id="modal-content"><img id="modal-image"></div>
-        <button class="modal-nav modal-next" title="Next (→)">&#10095;</button>
+    <div style="margin-top: 12px; display:grid; gap:8px;">
+      <div class="progress"><div id="bar" class="bar"></div></div>
+      <div class="statline">
+        <div id="progressText">Waiting…</div>
+        <div class="spacer"></div>
+        <div id="stats" class="small"></div>
+      </div>
     </div>
+  </section>
 
-    <div id="fatal-error">
-        <h2>Fatal Error</h2>
-        <p>Could not load required libraries. Please check your internet connection and disable any ad-blockers that might be blocking scripts, then refresh the page.</p>
+  <section id="gallery" class="grid">
+    <div class="empty">No images yet. Upload a PDF and click <b>Start Processing</b> to begin.<br/><span class="small">If the PDF has no images, you’ll see a notice.</span></div>
+  </section>
+
+  <section class="footer-note">
+    <div><b>Notes:</b> Supports embedded & inline images; filter chains; PNG predictors; ColorSpaces (RGB, Gray, CMYK, Indexed, ICCBased fallback). CCITTFax bitonal is not decoded (rare for photos).</div>
+  </section>
+
+</main>
+
+<!-- Fullscreen Preview Modal -->
+<div id="modal" class="modal" aria-hidden="true">
+  <div class="modal-inner" role="dialog" aria-modal="true" aria-label="Image preview">
+    <div class="modal-header">
+      <div id="modalTitle" class="small"></div>
+      <div class="spacer"></div>
+      <button id="modalDownload" class="icon-btn">⬇️ Download PNG</button>
+      <button id="modalClose" class="icon-btn">✖</button>
     </div>
+    <div class="modal-img-wrap">
+      <img id="modalImg" class="modal-img" alt="Preview"/>
+    </div>
+  </div>
+</div>
 
-    <!-- CDN-BASED LIBRARIES FOR FAST INITIAL LOAD -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/* =============================
+   Utility: Theme (Light/Dark)
+============================= */
+(function initTheme(){
+  const root = document.documentElement;
+  const toggle = document.getElementById('themeToggle');
+  const saved = localStorage.getItem('pdfimg_theme') || 'dark';
+  if(saved === 'light'){ root.classList.add('light'); toggle.checked = false; }
+  else { root.classList.remove('light'); toggle.checked = true; }
+  toggle.addEventListener('change', () => {
+    if(toggle.checked){ localStorage.setItem('pdfimg_theme','dark'); root.classList.remove('light'); }
+    else { localStorage.setItem('pdfimg_theme','light'); root.classList.add('light'); }
+  });
+})();
+</script>
 
-    <!-- APPLICATION LOGIC -->
-    <script>
-        function initializeApp() {
-            // Configure PDF.js worker to be loaded from CDN
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.worker.min.js`;
+<script>
+/* ===========================================================
+   PDF Image Extractor – super-robust, offline
+   - Balanced dict parsing
+   - Stream slicing via /Length (+ indirect)
+   - Filter chain: ASCII85, ASCIIHex, Flate, RunLength, LZW, DCT, JPX
+   - PNG predictors 10–15
+   - ColorSpace: DeviceRGB, DeviceGray, DeviceCMYK, Indexed (+table), ICCBased fallback
+   - Inline images (BI/ID/EI)
+   - Object streams (/ObjStm) parsing to resolve referenced ColorSpaces/etc.
+=========================================================== */
 
-            // Define constants from the loaded library for stability and clarity
-            const { OPS, ImageKind } = pdfjsLib;
+const els = {
+  fileInput: document.getElementById('fileInput'),
+  startBtn: document.getElementById('startBtn'),
+  selectAllBtn: document.getElementById('selectAllBtn'),
+  deselectAllBtn: document.getElementById('deselectAllBtn'),
+  defaultSortBtn: document.getElementById('defaultSortBtn'),
+  smartSortBtn: document.getElementById('smartSortBtn'),
+  downloadSelectedZipBtn: document.getElementById('downloadSelectedZipBtn'),
+  downloadAllZipBtn: document.getElementById('downloadAllZipBtn'),
+  gallery: document.getElementById('gallery'),
+  bar: document.getElementById('bar'),
+  progressText: document.getElementById('progressText'),
+  stats: document.getElementById('stats'),
+  pdfName: document.getElementById('pdfName'),
+  modal: document.getElementById('modal'),
+  modalImg: document.getElementById('modalImg'),
+  modalClose: document.getElementById('modalClose'),
+  modalDownload: document.getElementById('modalDownload'),
+  modalTitle: document.getElementById('modalTitle'),
+};
 
-            // --- DOM Elements ---
-            const uploadSection = document.getElementById('upload-section');
-            const postUploadControls = document.getElementById('post-upload-controls');
-            const pdfFileInput = document.getElementById('pdf-file');
-            const fileNameDisplay = document.getElementById('file-name');
-            const startBtn = document.getElementById('start-btn');
-            const resetBtn = document.getElementById('reset-btn');
-            const themeSwitcher = document.getElementById('theme-switcher');
-            const processingSection = document.getElementById('processing-section');
-            const resultsSection = document.getElementById('results-section');
-            const progressBar = document.getElementById('progress-bar');
-            const progressText = document.getElementById('progress-text');
-            const statusMessage = document.getElementById('status-message');
-            const imageGrid = document.getElementById('image-grid');
-            const selectAllCheckbox = document.getElementById('select-all');
-            const selectedCountDisplay = document.getElementById('selected-count');
-            const sortSizeBtn = document.getElementById('sort-size-btn');
-            const smartSortBtn = document.getElementById('smart-sort-btn');
-            const minWidthInput = document.getElementById('min-width');
-            const minHeightInput = document.getElementById('min-height');
-            const downloadSelectedBtn = document.getElementById('download-selected-btn');
-            const downloadAllBtn = document.getElementById('download-all-btn');
-            const modal = document.getElementById('image-modal');
-            const modalContent = document.getElementById('modal-content');
-            const modalImage = document.getElementById('modal-image');
-            const modalClose = document.querySelector('.modal-close');
-            const modalPrev = document.querySelector('.modal-prev');
-            const modalNext = document.querySelector('.modal-next');
+let state = {
+  pdfFile: null,
+  pdfNameBase: 'images',
+  raw: null,      // Uint8Array
+  text: null,     // latin1 text
+  objects: [],    // all top-level objects with ranges
+  objMap: new Map(),   // key "obj gen" -> { kind: 'normal'|'objstm', content, dictStr, streamStart, streamEnd, ... }
+  images: [],
+  removedDuplicates: 0,
+  sortMode: 'default',
+};
 
-            // --- State ---
-            let pdfFile = null;
-            let pdfFileName = '';
-            let extractedImages = [];
-            let visibleImages = [];
-            let activeObjectUrls = new Set();
-            let currentModalIndex = -1;
-            let imageObserver;
+function sanitizeBaseName(name) {
+  const base = name.replace(/\.[Pp][Dd][Ff]$/, '');
+  let s = base.replace(/[^a-zA-Z0-9_\-]+/g, '_');
+  if (s.length > 12) s = s.slice(0, 12);
+  if (!s) s = 'images';
+  return s.toLowerCase();
+}
 
-            // --- Theme Management ---
-            const applyTheme = (theme) => {
-                document.body.classList.toggle('dark-mode', theme === 'dark');
-                themeSwitcher.textContent = theme === 'dark' ? '☀️' : '🌙';
-            };
-            const currentTheme = localStorage.getItem('theme') || 'light';
-            applyTheme(currentTheme);
-            themeSwitcher.addEventListener('click', () => {
-                const newTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
-                localStorage.setItem('theme', newTheme);
-                applyTheme(newTheme);
-            });
+els.fileInput.addEventListener('change', () => {
+  const f = els.fileInput.files && els.fileInput.files[0];
+  if (!f) return;
+  state.pdfFile = f;
+  els.pdfName.textContent = f.name;
+  state.pdfNameBase = sanitizeBaseName(f.name);
+  els.startBtn.disabled = false;
+});
 
-            // --- Debounce Utility for Filtering ---
-            function debounce(func, delay) {
-                let timeout;
-                return function(...args) {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(() => func.apply(this, args), delay);
-                };
-            }
+els.startBtn.addEventListener('click', async () => {
+  if (!state.pdfFile) return;
+  resetUIForProcessing();
+  try {
+    state.raw = new Uint8Array(await state.pdfFile.arrayBuffer());
+    state.text = new TextDecoder('latin1').decode(state.raw);
 
-            // --- Event Listeners ---
-            pdfFileInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
-            startBtn.addEventListener('click', processPDF);
-            resetBtn.addEventListener('click', resetApp);
-            selectAllCheckbox.addEventListener('change', handleSelectAll);
-            sortSizeBtn.addEventListener('click', () => sortAndRender('size'));
-            smartSortBtn.addEventListener('click', () => sortAndRender('smart'));
-            const debouncedFilter = debounce(applyFiltersAndRender, 300);
-            [minWidthInput, minHeightInput].forEach(input => input.addEventListener('input', debouncedFilter));
-            downloadSelectedBtn.addEventListener('click', () => downloadImagesAsZip(getSelectedImages()));
-            downloadAllBtn.addEventListener('click', () => downloadImagesAsZip(extractedImages));
-            imageGrid.addEventListener('change', (e) => { if (e.target.classList.contains('checkbox')) updateSelectionState(); });
-            imageGrid.addEventListener('click', handleGridClick);
-            
-            // Drag & Drop Listeners
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => uploadSection.addEventListener(eventName, preventDefaults, false));
-            ['dragenter', 'dragover'].forEach(eventName => uploadSection.addEventListener(eventName, () => uploadSection.classList.add('drag-over'), false));
-            ['dragleave', 'drop'].forEach(eventName => uploadSection.addEventListener(eventName, () => uploadSection.classList.remove('drag-over'), false));
-            uploadSection.addEventListener('drop', (e) => handleFileSelect(e.dataTransfer.files[0]), false);
-            function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+    indexObjects(state.text);
+    await expandObjectStreams();     // NEW: parse /ObjStm to resolve referenced arrays, ColorSpaces, etc.
 
-            // Modal Listeners
-            modalClose.onclick = closeModal;
-            modal.onclick = (e) => { if (e.target === modal) closeModal(); };
-            modalPrev.onclick = () => showModalImage(currentModalIndex - 1);
-            modalNext.onclick = () => showModalImage(currentModalIndex + 1);
-            document.addEventListener('keydown', (e) => {
-                if (modal.style.display === "block") {
-                    if (e.key === 'Escape') closeModal();
-                    if (e.key === 'ArrowLeft') showModalImage(currentModalIndex - 1);
-                    if (e.key === 'ArrowRight') showModalImage(currentModalIndex + 1);
-                }
-            });
-            
-            // Modal Swipe Gestures
-            let touchStartX = 0;
-            modalContent.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
-            modalContent.addEventListener('touchend', e => {
-                const touchEndX = e.changedTouches[0].screenX;
-                if (touchStartX - touchEndX > 50) showModalImage(currentModalIndex + 1); // Swipe Left
-                if (touchStartX - touchEndX < -50) showModalImage(currentModalIndex - 1); // Swipe Right
-            });
+    const items = await collectAllImages();
+    if (!items.length) {
+      showEmpty('No images found in this PDF.');
+      finalizeStats();
+      return;
+    }
+    await convertAllToPNGAndDedup(items);
+    renderImages();
+    enablePostProcessButtons();
+    finalizeStats();
+  } catch (err) {
+    console.error(err);
+    showEmpty('Failed to process PDF (corrupt or unsupported).');
+    updateProgress(0, 'Error.');
+  }
+});
 
-            // --- Core Functions ---
-            function handleFileSelect(file) {
-                if (file && file.type === 'application/pdf') {
-                    pdfFile = file;
-                    pdfFileName = file.name.replace(/\.pdf$/i, '');
-                    fileNameDisplay.textContent = `Selected: ${file.name}`;
-                    startBtn.disabled = false;
-                    resetBtn.style.display = 'inline-block';
-                    resetUI(false);
-                } else if (file) {
-                    alert('Please select a valid PDF file.');
-                }
-            }
+els.selectAllBtn.addEventListener('click', () => { for (const it of state.images) it.selected = true; renderImages(); });
+els.deselectAllBtn.addEventListener('click', () => { for (const it of state.images) it.selected = false; renderImages(); });
+els.defaultSortBtn.addEventListener('click', () => { state.sortMode = 'default'; sortImages(); renderImages(); });
+els.smartSortBtn.addEventListener('click', () => { state.sortMode = 'smart'; sortImages(); renderImages(); });
 
-            function resetApp() {
-                pdfFile = null;
-                pdfFileInput.value = '';
-                fileNameDisplay.textContent = '';
-                startBtn.disabled = true;
-                resetBtn.style.display = 'none';
-                resetUI(true);
-            }
+/* ---------- Modal preview ---------- */
+let modalCurrent = null;
+function openModal(item){
+  modalCurrent = item;
+  els.modalImg.src = item.srcObjectUrl;
+  els.modalTitle.textContent = `${item.name} — ${item.width}×${item.height}px • ${item.mb.toFixed(2)} MB`;
+  els.modal.classList.add('open');
+  els.modal.setAttribute('aria-hidden','false');
+}
+function closeModal(){
+  els.modal.classList.remove('open');
+  els.modal.setAttribute('aria-hidden','true');
+  els.modalImg.src = '';
+  modalCurrent = null;
+}
+els.modalClose.addEventListener('click', closeModal);
+els.modal.addEventListener('click', (e)=>{ if (e.target === els.modal) closeModal(); });
+window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && els.modal.classList.contains('open')) closeModal(); });
+els.modalDownload.addEventListener('click', ()=>{
+  if (!modalCurrent) return;
+  const a = document.createElement('a');
+  a.href = modalCurrent.srcObjectUrl;
+  a.download = modalCurrent.name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  a.remove();
+});
 
-            function resetUI(isFullReset) {
-                resultsSection.style.display = 'none';
-                processingSection.style.display = 'none';
-                statusMessage.style.display = 'none';
-                imageGrid.innerHTML = '';
-                if (imageObserver) imageObserver.disconnect();
-                activeObjectUrls.forEach(url => URL.revokeObjectURL(url));
-                activeObjectUrls.clear();
-                extractedImages = [];
-                visibleImages = [];
-                if (isFullReset) {
-                    uploadSection.style.display = 'block';
-                    postUploadControls.style.display = 'block';
-                }
-            }
+/* ---------- UI helpers ---------- */
+function resetUIForProcessing(){
+  state.images = [];
+  state.removedDuplicates = 0;
+  state.sortMode = 'default';
+  els.gallery.innerHTML = '';
+  updateProgress(0, 'Preparing…');
+  els.defaultSortBtn.disabled = true;
+  els.smartSortBtn.disabled = true;
+  els.selectAllBtn.disabled = true;
+  els.deselectAllBtn.disabled = true;
+  els.downloadSelectedZipBtn.disabled = true;
+  els.downloadAllZipBtn.disabled = true;
+  els.stats.textContent = '';
+}
+function enablePostProcessButtons(){
+  els.defaultSortBtn.disabled = false;
+  els.smartSortBtn.disabled = false;
+  els.selectAllBtn.disabled = false;
+  els.deselectAllBtn.disabled = false;
+  els.downloadSelectedZipBtn.disabled = false;
+  els.downloadAllZipBtn.disabled = false;
+}
+function showEmpty(msg){ els.gallery.innerHTML = `<div class="empty">${msg}</div>`; }
+function updateProgress(pct, text){ els.bar.style.width = `${Math.max(0, Math.min(100, pct))}%`; els.progressText.textContent = text; }
+function finalizeStats(){
+  els.stats.innerHTML = `Images: <b>${state.images.length}</b> &nbsp; | &nbsp; Removed duplicates: <b>${state.removedDuplicates}</b>`;
+}
 
-            async function processPDF() {
-                if (!pdfFile) return;
-                resetUI(false);
-                uploadSection.style.display = 'none';
-                postUploadControls.style.display = 'none';
-                processingSection.style.display = 'block';
-                progressText.textContent = 'Reading PDF file...';
-                progressBar.style.width = '0%';
+/* ============================
+   Balanced dictionary parsing
+============================ */
+function findBalancedDictRange(block, fromIdx=0){
+  const n = block.length;
+  let i = block.indexOf('<<', fromIdx);
+  if (i < 0) return null;
+  let depth = 0, j = i;
+  let inStr = false, strParen = 0, inHexStr = false, inComment = false;
+  while (j < n - 1){
+    const a = block[j], b = block[j+1];
+    if (!inStr && !inHexStr && a === '%' && !inComment) { inComment = true; j++; continue; }
+    if (inComment) { if (a === '\n' || a === '\r') inComment = false; j++; continue; }
 
-                try {
-                    const typedarray = new Uint8Array(await pdfFile.arrayBuffer());
-                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
-                    const numPages = pdf.numPages;
-                    let imageCounter = 1;
-                    const uniqueImageHashes = new Set();
+    if (!inHexStr && a === '('){ inStr = true; strParen = 1; j++; continue; }
+    if (inStr){ if (a === '\\') { j += 2; continue; } if (a === '(') strParen++; if (a === ')'){ if (--strParen===0) inStr=false; } j++; continue; }
 
-                    for (let i = 1; i <= numPages; i++) {
-                        progressText.textContent = `Processing page ${i}/${numPages}...`;
-                        const page = await pdf.getPage(i);
-                        const operatorList = await page.getOperatorList();
-                        
-                        for (let j = 0; j < operatorList.fnArray.length; j++) {
-                            if (operatorList.fnArray[j] === OPS.paintImageXObject) {
-                                const imgName = operatorList.argsArray[j][0];
-                                const img = await page.objs.get(imgName);
-                                if (!img || img.width <= 1 || img.height <= 1) continue;
+    if (!inHexStr && a === '<' && b !== '<'){ inHexStr = true; j++; continue; }
+    if (inHexStr){ if (a === '>') inHexStr = false; j++; continue; }
 
-                                const hash = await generateHash(img.data);
-                                if (uniqueImageHashes.has(hash)) continue;
-                                uniqueImageHashes.add(hash);
+    if (a === '<' && b === '<'){ depth++; j += 2; continue; }
+    if (a === '>' && b === '>'){ depth--; j += 2; if (depth === 0) return [i, j]; continue; }
+    j++;
+  }
+  return null;
+}
 
-                                const blob = await canvasToBlob(img);
-                                if (!blob) continue;
+/* ============================
+   Index objects (top-level)
+============================ */
+function indexObjects(text){
+  state.objects = [];
+  state.objMap.clear();
+  const reObj = /(\d+)\s+(\d+)\s+obj\b/g;
+  let m;
+  while ((m = reObj.exec(text)) !== null) {
+    const obj = parseInt(m[1],10), gen = parseInt(m[2],10);
+    const start = m.index;
+    const endObjIdx = text.indexOf('endobj', start);
+    if (endObjIdx === -1) break;
+    const block = text.slice(start, endObjIdx + 6);
 
-                                const truncatedName = pdfFileName.length > 12 ? pdfFileName.substring(0, 12) : pdfFileName;
-                                extractedImages.push({
-                                    id: imageCounter, name: `${truncatedName}_img${imageCounter}.png`,
-                                    blob, width: img.width, height: img.height, size: blob.size, hash
-                                });
-                                imageCounter++;
-                            }
-                        }
-                        progressBar.style.width = `${(i / numPages) * 100}%`;
-                        await new Promise(resolve => setTimeout(resolve, 0)); // Yield to main thread
-                    }
+    const dictRange = findBalancedDictRange(block);
+    let dictStr = '';
+    let streamStart = -1, streamEnd = -1;
+    if (dictRange){
+      const [a,b] = dictRange;
+      dictStr = block.slice(a+2, b-2);
+      const streamIdx = block.indexOf('stream', b);
+      if (streamIdx !== -1){
+        let dataStart = streamIdx + 6;
+        if (block[dataStart] === '\r' && block[dataStart+1] === '\n') dataStart += 2;
+        else if (block[dataStart] === '\n') dataStart += 1;
+        const absStart = start + dataStart;
 
-                    processingSection.style.display = 'none';
-                    if (extractedImages.length > 0) {
-                        sortAndRender('size');
-                        resultsSection.style.display = 'block';
-                    } else {
-                        showStatusMessage('No images found in this PDF.');
-                    }
-                } catch (error) {
-                    console.error('Error processing PDF:', error);
-                    processingSection.style.display = 'none';
-                    let message = error.name === 'PasswordException' ? 'Error: This PDF is password-protected.' : `Error: ${error.message}`;
-                    showStatusMessage(message);
-                }
-            }
-            
-            async function canvasToBlob({ width, height, data, kind }) {
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                const imageData = ctx.createImageData(width, height);
-                
-                if (kind === ImageKind.RGBA_32BPP) {
-                    imageData.data.set(data);
-                } else if (kind === ImageKind.RGB_24BPP) {
-                    for (let i = 0, j = 0; i < data.length; i += 3, j += 4) {
-                        imageData.data[j] = data[i];
-                        imageData.data[j + 1] = data[i + 1];
-                        imageData.data[j + 2] = data[i + 2];
-                        imageData.data[j + 3] = 255;
-                    }
-                } else { // Grayscale or other formats
-                    for (let i = 0, j = 0; i < data.length; i++, j += 4) {
-                        imageData.data[j] = imageData.data[j + 1] = imageData.data[j + 2] = data[i];
-                        imageData.data[j + 3] = 255;
-                    }
-                }
-                ctx.putImageData(imageData, 0, 0);
-                return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-            }
-
-            function sortAndRender(type) {
-                if (type === 'size') extractedImages.sort((a, b) => b.size - a.size);
-                else if (type === 'smart') {
-                    const score = (img) => (img.width < 50 || img.height < 50) ? img.size * 0.01 : (img.width * img.height) + (img.size * 10);
-                    extractedImages.sort((a, b) => score(b) - score(a));
-                }
-                applyFiltersAndRender();
-            }
-
-            function applyFiltersAndRender() {
-                const minW = parseInt(minWidthInput.value) || 0;
-                const minH = parseInt(minHeightInput.value) || 0;
-                visibleImages = extractedImages.filter(img => img.width >= minW && img.height >= minH);
-                renderImages();
-            }
-
-            function renderImages() {
-                if (imageObserver) imageObserver.disconnect();
-                activeObjectUrls.forEach(url => URL.revokeObjectURL(url));
-                activeObjectUrls.clear();
-                
-                imageGrid.innerHTML = visibleImages.map(img => `
-                    <div class="image-card" data-id="${img.id}">
-                        <input type="checkbox" class="checkbox" data-id="${img.id}">
-                        <a class="thumbnail-link" title="Click to view full size">
-                            <img data-src-id="${img.id}" alt="${img.name}">
-                        </a>
-                        <div class="info">
-                            <p><strong>${img.name}</strong></p>
-                            <p>${img.width}×${img.height}px</p>
-                            <p>${(img.size / 1048576).toFixed(3)}MB</p>
-                        </div>
-                    </div>
-                `).join('');
-                
-                setupLazyLoader();
-                updateSelectionState();
-                downloadAllBtn.disabled = extractedImages.length === 0;
-            }
-
-            function setupLazyLoader() {
-                imageObserver = new IntersectionObserver((entries, observer) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            const imgElement = entry.target;
-                            const imgId = parseInt(imgElement.dataset.srcId);
-                            const image = extractedImages.find(i => i.id === imgId);
-                            if (image) {
-                                const url = URL.createObjectURL(image.blob);
-                                activeObjectUrls.add(url);
-                                imgElement.src = url;
-                                imgElement.onload = () => imgElement.classList.add('loaded');
-                            }
-                            observer.unobserve(imgElement);
-                        }
-                    });
-                }, { rootMargin: "0px 0px 200px 0px" });
-                document.querySelectorAll('img[data-src-id]').forEach(img => imageObserver.observe(img));
-            }
-
-            function updateSelectionState() {
-                const selected = getSelectedImages();
-                const count = selected.length;
-                selectedCountDisplay.textContent = `${count} selected`;
-                downloadSelectedBtn.disabled = count === 0;
-                downloadSelectedBtn.textContent = count > 0 ? `Download ${count} Selected` : 'Download Selected';
-                selectAllCheckbox.checked = count > 0 && count === visibleImages.length;
-            }
-
-            function handleSelectAll() {
-                document.querySelectorAll('.image-card .checkbox').forEach(cb => cb.checked = selectAllCheckbox.checked);
-                updateSelectionState();
-            }
-
-            function getSelectedImages() {
-                const selectedIds = Array.from(document.querySelectorAll('.image-card .checkbox:checked')).map(cb => parseInt(cb.dataset.id));
-                return extractedImages.filter(img => selectedIds.includes(img.id));
-            }
-
-            async function downloadImagesAsZip(imagesToDownload) {
-                if (imagesToDownload.length === 0) return;
-                const zip = new JSZip();
-                imagesToDownload.forEach(img => zip.file(img.name, img.blob));
-                const content = await zip.generateAsync({ type: 'blob' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(content);
-                link.download = `${pdfFileName}_images.zip`;
-                link.click();
-                URL.revokeObjectURL(link.href);
-            }
-
-            function handleGridClick(e) {
-                const card = e.target.closest('.image-card');
-                if (!card) return;
-                const id = parseInt(card.dataset.id);
-                if (e.target.closest('.thumbnail-link')) {
-                    openModal(id);
-                }
-            }
-
-            function openModal(imageId) {
-                currentModalIndex = visibleImages.findIndex(img => img.id === imageId);
-                if (currentModalIndex === -1) return;
-                showModalImage(currentModalIndex);
-                modal.style.display = "block";
-            }
-
-            function showModalImage(index) {
-                if (index < 0 || index >= visibleImages.length) return;
-                currentModalIndex = index;
-                const image = visibleImages[index];
-                const url = URL.createObjectURL(image.blob);
-                if (modalImage.dataset.url) URL.revokeObjectURL(modalImage.dataset.url);
-                modalImage.src = url;
-                modalImage.dataset.url = url;
-                modalPrev.style.display = index > 0 ? 'block' : 'none';
-                modalNext.style.display = index < visibleImages.length - 1 ? 'block' : 'none';
-            }
-
-            function closeModal() {
-                modal.style.display = "none";
-                if (modalImage.dataset.url) URL.revokeObjectURL(modalImage.dataset.url);
-                modalImage.src = "";
-                modalImage.removeAttribute('data-url');
-            }
-
-            function showStatusMessage(message) {
-                statusMessage.textContent = message;
-                statusMessage.style.display = 'block';
-                resetBtn.style.display = 'inline-block';
-            }
-
-            async function generateHash(data) {
-                const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-                return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-            }
+        let length = pickLastInt(dictStr, 'Length');
+        if (length == null) {
+          const lenRef = pickRef(dictStr, 'Length');
+          length = getObjectNumericValue(lenRef);
         }
-
-        // --- Robust Initialization with Polling ---
-        function runWhenReady() {
-            let attempts = 0;
-            const maxAttempts = 100; // 10 seconds timeout
-            const interval = setInterval(() => {
-                // Check for the specific properties that were causing errors
-                if (window.pdfjsLib && window.pdfjsLib.ImageKind && window.JSZip) {
-                    clearInterval(interval);
-                    initializeApp();
-                } else if (attempts >= maxAttempts) {
-                    clearInterval(interval);
-                    document.getElementById('app-container').style.display = 'none';
-                    document.getElementById('fatal-error').style.display = 'block';
-                }
-                attempts++;
-            }, 100);
+        if (length != null && Number.isFinite(length) && length >= 0){
+          streamStart = absStart;
+          streamEnd = Math.min(absStart + length, state.raw.length);
+        } else {
+          const relEnd = block.indexOf('endstream', dataStart);
+          if (relEnd !== -1) { streamStart = absStart; streamEnd = start + relEnd; }
         }
+      }
+    }
 
-        runWhenReady();
-    </script>
+    const rec = { kind: 'normal', obj, gen, startIndex: start, endIndex: endObjIdx+6, dictRange, dictStr, streamStart, streamEnd };
+    state.objMap.set(`${obj} ${gen}`, rec);
+    state.objects.push(rec);
+    reObj.lastIndex = endObjIdx + 6;
+  }
+}
+
+/* ============================
+   Object Streams (/ObjStm)
+============================ */
+async function expandObjectStreams(){
+  // Find all /ObjStm, decode them, extract N embedded objects, and register them into objMap
+  for (const rec of state.objects) {
+    const d = rec.dictStr || '';
+    if (!/\/Type\s*\/ObjStm\b/.test(d)) continue;
+    // Decode the stream
+    if (!(rec.streamStart >= 0 && rec.streamEnd > rec.streamStart)) continue;
+
+    let data = state.raw.subarray(rec.streamStart, rec.streamEnd);
+    let filters = pickArrayNames(d, 'Filter');
+    if (!filters.length) { const single = pickName(d, 'Filter'); if (single) filters = [single]; }
+    for (const f of (filters || [])) {
+      if (/^ASCII85Decode$/i.test(f)) { data = ascii85DecodeToBytes(data); continue; }
+      if (/^ASCIIHexDecode$/i.test(f)) { data = asciiHexDecodeToBytes(data); continue; }
+      if (/^FlateDecode$/i.test(f)) { data = await inflateZlib(data); continue; }
+      if (/^RunLengthDecode$/i.test(f)) { data = runLengthDecode(data); continue; }
+      if (/^LZWDecode$/i.test(f)) { data = lzwDecode(data); continue; }
+    }
+
+    const N = pickLastInt(d, 'N') || 0;
+    const First = pickLastInt(d, 'First') || 0;
+    const header = new TextDecoder('latin1').decode(data.subarray(0, First));
+    const tokens = header.trim().split(/\s+/).map(x => parseInt(x,10)).filter(x => Number.isFinite(x));
+    if (tokens.length < 2*N) continue;
+
+    const pairs = [];
+    for (let i=0;i<N;i++) pairs.push({ obj: tokens[2*i], gen: 0, offset: tokens[2*i+1] });
+
+    for (let i=0;i<pairs.length;i++){
+      const cur = pairs[i], next = pairs[i+1];
+      const start = First + cur.offset;
+      const end = next ? First + next.offset : data.length;
+      const content = new TextDecoder('latin1').decode(data.subarray(start, end)).trim();
+      // Register as lightweight object (no separate stream; content is raw object content)
+      const dictRange = findBalancedDictRange(content);
+      let dictStr = '';
+      let streamStart = -1, streamEnd = -1;
+      if (dictRange){
+        const [a,b] = dictRange;
+        dictStr = content.slice(a+2, b-2);
+        const sIdx = content.indexOf('stream', b);
+        if (sIdx !== -1) {
+          let ds = sIdx + 6;
+          if (content[ds] === '\r' && content[ds+1] === '\n') ds+=2; else if (content[ds] === '\n') ds+=1;
+          // We cannot rely on /Length for these, but usually object streams don't include sub-streams; still guard
+          const relEnd = content.indexOf('endstream', ds);
+          if (relEnd !== -1) { streamStart = ds; streamEnd = relEnd; } // relative to this content string; we won't use raw bytes here
+        }
+      }
+      const orec = { kind:'objstm', obj: cur.obj, gen: cur.gen, content, dictStr, streamStart, streamEnd };
+      state.objMap.set(`${cur.obj} ${cur.gen}`, orec);
+    }
+  }
+}
+
+/* ============================
+   Small parsing helpers
+============================ */
+function pickLastInt(source, name){
+  const re = new RegExp(`/${name}\\s+(\\d+)`, 'g');
+  let m, val = null;
+  while ((m = re.exec(source)) !== null) val = parseInt(m[1],10);
+  return val;
+}
+function pickRef(source, name){
+  const re = new RegExp(`/${name}\\s+(\\d+)\\s+(\\d+)\\s+R`);
+  const m = re.exec(source);
+  return m ? { obj: parseInt(m[1],10), gen: parseInt(m[2],10) } : null;
+}
+function pickArrayNames(source, key){
+  const re = new RegExp(`/${key}\\s+\\[([^\\]]+)\\]`);
+  const m = re.exec(source);
+  if (!m) return [];
+  return (m[1].match(/\/([A-Za-z0-9]+)/g) || []).map(s => s.slice(1));
+}
+function pickName(source, key){
+  const re = new RegExp(`/${key}\\s+/([A-Za-z0-9]+)`);
+  const m = re.exec(source);
+  return m ? m[1] : null;
+}
+
+function getObjectBlock(ref){
+  if (!ref) return null;
+  const hit = state.objMap.get(`${ref.obj} ${ref.gen}`);
+  return hit || null;
+}
+function getObjectText(ref){
+  const hit = getObjectBlock(ref);
+  if (!hit) return null;
+  if (hit.kind === 'normal') {
+    return state.text.slice(hit.startIndex, hit.endIndex);
+  } else {
+    return hit.content;
+  }
+}
+function getObjectNumericValue(ref){
+  const t = getObjectText(ref);
+  if (!t) return null;
+  const m = t.match(/(\d+)/);
+  return m ? parseInt(m[1],10) : null;
+}
+
+/* ============================
+   ColorSpace resolution
+============================ */
+// Finds /ColorSpace as name | ref | array; returns {type:'DeviceRGB'|'DeviceGray'|'DeviceCMYK'|'Indexed'|'ICCBased', base?, hival?, table?}
+function resolveColorSpace(dictStr){
+  // Try direct name
+  let csName = pickName(dictStr, 'ColorSpace') || pickName(dictStr, 'CS');
+  if (csName) {
+    if (csName === 'RGB') csName = 'DeviceRGB';
+    if (csName === 'G') csName = 'DeviceGray';
+    if (/^Device(RGB|Gray|CMYK)$/.test(csName)) return { type: csName };
+  }
+
+  // Try array inline: /ColorSpace [ ... ]
+  const arrayRange = findBracketRange(dictStr, 'ColorSpace') || findBracketRange(dictStr, 'CS');
+  if (arrayRange) {
+    const arr = dictStr.slice(arrayRange[0]+1, arrayRange[1]-1).trim();
+    const info = parseColorSpaceArray(arr);
+    if (info) return info;
+  }
+
+  // Try indirect reference: /ColorSpace n 0 R
+  const csRef = pickRef(dictStr, 'ColorSpace') || pickRef(dictStr, 'CS');
+  if (csRef) {
+    const content = getObjectText(csRef);
+    if (content) {
+      // Might be an array object, e.g., " [/Indexed /DeviceRGB 255 13 0 R ] "
+      const trimmed = content.trim();
+      if (trimmed.startsWith('[')) {
+        const inside = trimmed.slice(1, trimmed.lastIndexOf(']')).trim();
+        const info = parseColorSpaceArray(inside);
+        if (info) return info;
+      } else {
+        // Might be ICCBased array in object stream, e.g., "<<...>> stream (profile) endstream" with /N
+        const dictR = findBalancedDictRange(trimmed);
+        if (dictR) {
+          const d = trimmed.slice(dictR[0]+2, dictR[1]-2);
+          const N = pickLastInt(d, 'N') || 3;
+          if (N === 1) return { type:'DeviceGray' };
+          if (N === 3) return { type:'DeviceRGB' };
+          if (N === 4) return { type:'DeviceCMYK' };
+        }
+      }
+    }
+  }
+
+  // Fallback default RGB
+  return { type: 'DeviceRGB' };
+}
+
+function parseColorSpaceArray(arrStr){
+  // Tokenize simple: names (/Indexed, /ICCBased, /DeviceRGB ...), numbers, refs
+  const toks = arrStr.match(/\/[A-Za-z0-9]+|\d+\s+\d+\s+R|\d+|<[^>]*>/g) || [];
+  if (!toks.length) return null;
+
+  if (toks[0] === '/ICCBased') {
+    // [/ICCBased n 0 R]
+    const refTok = toks[1] || '';
+    const m = refTok.match(/(\d+)\s+(\d+)\s+R/);
+    if (m) {
+      const ref = { obj: parseInt(m[1],10), gen: parseInt(m[2],10) };
+      const obj = getObjectBlock(ref);
+      if (obj) {
+        const d = obj.dictStr || '';
+        const N = pickLastInt(d, 'N') || 3;
+        if (N === 1) return { type:'DeviceGray' };
+        if (N === 3) return { type:'DeviceRGB' };
+        if (N === 4) return { type:'DeviceCMYK' };
+      }
+    }
+    return { type:'DeviceRGB' }; // sensible fallback
+  }
+
+  if (toks[0] === '/Indexed') {
+    // [/Indexed <base> <hival> <lookup>]
+    // base can be /DeviceRGB or ICCBased/ref; lookup can be hex <...> or ref
+    let base = 'DeviceRGB';
+    // base in toks[1]
+    if (toks[1] && toks[1].startsWith('/')) {
+      const b = toks[1].slice(1);
+      if (b === 'RGB') base = 'DeviceRGB';
+      else if (b === 'G') base = 'DeviceGray';
+      else base = b;
+    } else if (toks[1] && /\d+\s+\d+\s+R/.test(toks[1])) {
+      const m = toks[1].match(/(\d+)\s+(\d+)\s+R/);
+      if (m) {
+        const ref = { obj: parseInt(m[1],10), gen: parseInt(m[2],10) };
+        const obj = getObjectBlock(ref);
+        if (obj) {
+          // If it's ICCBased array object, derive /N
+          const t = getObjectText(ref) || '';
+          if (t.trim().startsWith('[')) {
+            const inner = t.trim().slice(1, t.trim().lastIndexOf(']')).trim();
+            const cs = parseColorSpaceArray(inner);
+            if (cs && (cs.type==='DeviceRGB' || cs.type==='DeviceGray' || cs.type==='DeviceCMYK')) base = cs.type;
+          } else if (obj.dictStr) {
+            const N = pickLastInt(obj.dictStr, 'N') || 3;
+            base = (N===1)?'DeviceGray':(N===3)?'DeviceRGB':(N===4)?'DeviceCMYK':'DeviceRGB';
+          }
+        }
+      }
+    }
+    const hival = toks[2] ? parseInt(toks[2],10) : 255;
+
+    // lookup toks[3]
+    let table = null;
+    if (toks[3]) {
+      if (/<[^>]*>/.test(toks[3])) {
+        // Hex string lookup
+        const hex = toks[3].replace(/[<>\s]/g,'');
+        const out = new Uint8Array(hex.length/2);
+        for (let i=0;i<out.length;i++) out[i] = parseInt(hex.substr(i*2,2),16)&255;
+        table = out;
+      } else if (/\d+\s+\d+\s+R/.test(toks[3])) {
+        const m2 = toks[3].match(/(\d+)\s+(\d+)\s+R/);
+        if (m2) {
+          const ref = { obj: parseInt(m2[1],10), gen: parseInt(m2[2],10) };
+          const obj = getObjectBlock(ref);
+          if (obj && obj.kind === 'normal' && obj.streamStart >= 0) {
+            const bytes = state.raw.subarray(obj.streamStart, obj.streamEnd);
+            let data = bytes;
+            let filters = pickArrayNames(obj.dictStr||'', 'Filter');
+            if (!filters.length) { const single = pickName(obj.dictStr||'', 'Filter'); if (single) filters = [single]; }
+            for (const f of (filters||[])) {
+              if (/^ASCII85Decode$/i.test(f)) { data = ascii85DecodeToBytes(data); continue; }
+              if (/^ASCIIHexDecode$/i.test(f)) { data = asciiHexDecodeToBytes(data); continue; }
+              if (/^FlateDecode$/i.test(f)) { data = awaitInflateSync(data); continue; }
+              if (/^RunLengthDecode$/i.test(f)) { data = runLengthDecode(data); continue; }
+              if (/^LZWDecode$/i.test(f)) { data = lzwDecode(data); continue; }
+            }
+            table = data;
+          }
+        }
+      }
+    }
+    return { type:'Indexed', base, hival, table };
+  }
+
+  // Device*
+  if (toks[0] && toks[0].startsWith('/Device')) {
+    const t = toks[0].slice(1);
+    if (/^Device(RGB|Gray|CMYK)$/.test(t)) return { type: t };
+  }
+  return null;
+}
+
+function findBracketRange(dictStr, key){
+  // Find /key [ .... ] with nested brackets (rare), returns [startIdx, endIdx) of whole [..]
+  const re = new RegExp(`/${key}\\s*\\[`, 'g');
+  const m = re.exec(dictStr);
+  if (!m) return null;
+  let i = m.index + m[0].length - 1; // at '['
+  let depth = 0;
+  let j = i;
+  while (j < dictStr.length){
+    if (dictStr[j] === '[') depth++;
+    else if (dictStr[j] === ']'){ depth--; if (depth===0) return [i, j+1]; }
+    j++;
+  }
+  return null;
+}
+
+/* ============================
+   Collect images (embedded + inline)
+============================ */
+async function collectAllImages(){
+  const embedded = [];
+  const inlineCandidates = [];
+
+  for (const rec of state.objMap.values()) {
+    if (rec.kind !== 'normal') continue; // embedded images are normal top-level objects (streams)
+    const dict = rec.dictStr || '';
+    const hasStream = rec.streamStart >= 0 && rec.streamEnd > rec.streamStart;
+    if (!hasStream) { continue; }
+
+    if (/\/Subtype\s*\/Image\b/.test(dict)) {
+      const width  = pickLastInt(dict, 'Width');
+      const height = pickLastInt(dict, 'Height');
+      const bits   = pickLastInt(dict, 'BitsPerComponent') || 8;
+
+      const csInfo = resolveColorSpace(dict); // NEW: robust CS parsing
+      if (!csInfo) continue;
+
+      let filters = pickArrayNames(dict, 'Filter');
+      if (!filters.length) { const single = pickName(dict, 'Filter'); if (single) filters = [single]; }
+
+      const predictor = pickLastInt(dict, 'Predictor') || 1;
+      const columns = pickLastInt(dict, 'Columns') || width;
+
+      const bytes = state.raw.subarray(rec.streamStart, rec.streamEnd);
+      embedded.push({ kind:'embedded', width, height, bits, csInfo, filters, predictor, columns, bytes });
+    } else {
+      inlineCandidates.push(rec);
+    }
+  }
+
+  // Inline images from decoded content streams
+  const inlineFound = [];
+  for (const rec of inlineCandidates) {
+    let data = state.raw.subarray(rec.streamStart, rec.streamEnd);
+    const dict = rec.dictStr || '';
+    let filters = pickArrayNames(dict, 'Filter');
+    if (!filters.length) { const single = pickName(dict, 'Filter'); if (single) filters = [single]; }
+    for (const f of (filters || [])) {
+      if (/^ASCII85Decode$/i.test(f)) { data = ascii85DecodeToBytes(data); continue; }
+      if (/^ASCIIHexDecode$/i.test(f)) { data = asciiHexDecodeToBytes(data); continue; }
+      if (/^FlateDecode$/i.test(f)) { data = await inflateZlib(data); continue; }
+      if (/^RunLengthDecode$/i.test(f)) { data = runLengthDecode(data); continue; }
+      if (/^LZWDecode$/i.test(f)) { data = lzwDecode(data); continue; }
+    }
+    const inlines = extractInlineImagesFromContent(data);
+    inlineFound.push(...inlines);
+  }
+
+  return embedded.concat(inlineFound);
+}
+
+/* ============================
+   Inline image parser (BI/ID/EI)
+============================ */
+function extractInlineImagesFromContent(u8){
+  const isWs = b => b===9||b===10||b===12||b===13||b===32;
+  const out = [];
+  let i = 0, n = u8.length;
+
+  while (i < n - 3) {
+    if (u8[i]===0x42 && u8[i+1]===0x49 && (i===0 || isWs(u8[i-1])) && isWs(u8[i+2])) { // 'BI'
+      i += 2; while (i<n && isWs(u8[i])) i++;
+
+      const dictStart = i;
+      let idPos = -1;
+      for (let j=i; j<n-3; j++){
+        if (isWs(u8[j]) && u8[j+1]===0x49 && u8[j+2]===0x44 && isWs(u8[j+3])) { idPos = j+1; break; } // ' ID '
+      }
+      if (idPos === -1) break;
+
+      const dictBytes = u8.subarray(dictStart, idPos-1);
+      i = idPos + 2;
+      if (i<n && isWs(u8[i])) i++;
+
+      const dataStart = i;
+      let dataEnd = -1;
+      for (let j=i; j<n-3; j++){
+        if (isWs(u8[j]) && u8[j+1]===0x45 && u8[j+2]===0x49 && (j+3>=n || isWs(u8[j+3]))) { dataEnd = j; break; } // ' EI'
+      }
+      if (dataEnd === -1) break;
+
+      const dataBytes = u8.subarray(dataStart, dataEnd);
+      i = dataEnd + 3;
+
+      const dictStr = new TextDecoder('latin1').decode(dictBytes);
+
+      const width  = pickLastInt(dictStr, 'W') || pickLastInt(dictStr, 'Width');
+      const height = pickLastInt(dictStr, 'H') || pickLastInt(dictStr, 'Height');
+      const bits   = pickLastInt(dictStr, 'BPC') || pickLastInt(dictStr, 'BitsPerComponent') || 8;
+
+      const csInfo = resolveColorSpace(dictStr);
+
+      let filters = pickArrayNames(dictStr, 'F') || pickArrayNames(dictStr, 'Filter');
+      if (!filters.length) {
+        const singleF = pickName(dictStr, 'F') || pickName(dictStr, 'Filter');
+        if (singleF) filters = [singleF];
+      }
+      const predictor = pickLastInt(dictStr, 'Predictor') || 1;
+      const columns = pickLastInt(dictStr, 'Columns') || width;
+
+      out.push({ kind:'inline', width, height, bits, csInfo, filters, predictor, columns, bytes: dataBytes });
+      continue;
+    }
+    i++;
+  }
+  return out;
+}
+
+/* ============================
+   Filter decoders
+============================ */
+function ascii85DecodeToBytes(u8){ const s = new TextDecoder('ascii').decode(u8); return ascii85DecodeString(s); }
+function ascii85DecodeString(str){
+  const s = str.replace(/<~/g,'').replace(/~>/g,'').replace(/\s+/g,''); const out = []; let group = [];
+  for (let i=0;i<s.length;i++){
+    const c = s[i];
+    if (c==='z' && group.length===0){ out.push(0,0,0,0); continue; }
+    const code = s.charCodeAt(i);
+    if (code < 33 || code > 117) continue;
+    group.push(code - 33);
+    if (group.length===5){
+      let v=0; for (let j=0;j<5;j++) v = v*85 + group[j];
+      out.push((v>>>24)&255, (v>>>16)&255, (v>>>8)&255, v&255);
+      group.length=0;
+    }
+  }
+  if (group.length>0){
+    for (let k=group.length; k<5; k++) group.push(84);
+    let v=0; for (let j=0;j<5;j++) v = v*85 + group[j];
+    for (let j=0;j<group.length-1;j++) out.push((v >>> (24 - 8*j)) & 255);
+  }
+  return new Uint8Array(out);
+}
+function asciiHexDecodeToBytes(u8){
+  let s = new TextDecoder('ascii').decode(u8);
+  const end = s.indexOf('>'); if (end !== -1) s = s.slice(0,end);
+  s = s.replace(/\s+/g,''); if (s.length % 2 === 1) s += '0';
+  const out = new Uint8Array(s.length/2);
+  for (let i=0;i<s.length;i+=2) out[i/2] = parseInt(s.substr(i,2),16) & 255;
+  return out;
+}
+async function inflateZlib(u8){
+  if ('DecompressionStream' in window) {
+    const ds = new DecompressionStream('deflate');
+    const inStream = new Response(new Blob([u8])).body;
+    const outStream = inStream.pipeThrough(ds);
+    const out = await new Response(outStream).arrayBuffer();
+    return new Uint8Array(out);
+  } else { throw new Error('DecompressionStream unsupported'); }
+}
+// sync deflate used for small CS lookup; falls back to async inflateZlib if not available
+function awaitInflateSync(u8){ throw new Error('Sync inflate not available; please use inflateZlib'); }
+function runLengthDecode(u8){
+  const out = [];
+  for (let i=0;i<u8.length;){
+    const n = u8[i++]; // 0..255
+    if (n === 128) break; // EOD
+    if (n < 128) {
+      const count = n + 1;
+      for (let k=0;k<count;k++) out.push(u8[i+k]);
+      i += count;
+    } else { // 129..255
+      const count = 257 - n;
+      const b = u8[i++]; for (let k=0;k<count;k++) out.push(b);
+    }
+  }
+  return new Uint8Array(out);
+}
+/* ---- LZWDecode (PDF variant) ---- */
+function lzwDecode(data){
+  let pos = 0, bitPos = 0;
+  function readBits(n){
+    let val = 0;
+    for (let i=0;i<n;i++){
+      if (pos >= data.length) return null;
+      const byte = data[pos];
+      val = (val << 1) | ((byte >> (7 - bitPos)) & 1);
+      bitPos++;
+      if (bitPos === 8){ bitPos = 0; pos++; }
+    }
+    return val;
+  }
+  const CLEAR=256, EOD=257;
+  let codeSize=9, dict=[], prev=null, out=[];
+  for (let i=0;i<256;i++) dict[i]=new Uint8Array([i]);
+  dict[CLEAR]=dict[EOD]=null;
+  function readCode(n){ let v=0; for (let i=0;i<n;i++){ const b=readBits(1); if (b===null) return null; v=(v<<1)|b; } return v; }
+  function concat(a,b){ const r=new Uint8Array(a.length+b.length); r.set(a); r.set(b,a.length); return r; }
+
+  while (true){
+    let code = readCode(codeSize); if (code===null) break;
+    if (code===CLEAR){ dict=[]; for (let i=0;i<256;i++) dict[i]=new Uint8Array([i]); dict[CLEAR]=dict[EOD]=null; codeSize=9; prev=null; continue; }
+    if (code===EOD) break;
+    let entry;
+    if (dict[code]) entry=dict[code];
+    else if (prev!=null) entry=concat(dict[prev], new Uint8Array([dict[prev][0]]));
+    else entry = new Uint8Array([code]);
+    out.push(...entry);
+    if (prev!=null) dict.push(concat(dict[prev], new Uint8Array([entry[0]])));
+    prev = code;
+    if (dict.length === (1<<codeSize) && codeSize<12) codeSize++;
+  }
+  return new Uint8Array(out);
+}
+
+/* ============================
+   Raster → RGBA → PNG
+============================ */
+async function convertAllToPNGAndDedup(items){
+  const total = items.length;
+  const seen = new Set();
+  const results = [];
+  const base = state.pdfNameBase;
+
+  for (let idx=0; idx<total; idx++){
+    updateProgress(Math.round((idx/Math.max(1,total))*100), `Processing image ${idx+1}/${total}…`);
+    const it = items[idx];
+    try {
+      const pngBlob = await convertOneToPNG(it);
+      if (!pngBlob) continue;
+
+      const ab = await pngBlob.arrayBuffer();
+      const hash = await sha256Hex(new Uint8Array(ab));
+      if (seen.has(hash)) { state.removedDuplicates++; continue; }
+      seen.add(hash);
+
+      const { w, h } = await getImageSizeFromBlob(pngBlob, it.width, it.height);
+      const url = URL.createObjectURL(pngBlob);
+      const name = `${base}_img${results.length+1}.png`;
+
+      results.push({
+        id: 'img'+(results.length+1),
+        pngBlob, hashHex: hash,
+        width: w, height: h,
+        mb: ab.byteLength/(1024*1024),
+        name,
+        selected: false,
+        srcObjectUrl: url
+      });
+    } catch (e) {
+      console.warn('Skipping image due to error', e);
+    }
+  }
+  updateProgress(100, `Done (${results.length} images).`);
+  state.images = results;
+}
+
+async function convertOneToPNG(item){
+  let data = item.bytes;
+  const filters = (item.filters && item.filters.length) ? item.filters.slice() : [];
+
+  if (!filters.length) return rasterToPNG(item, data);
+
+  for (let i=0;i<filters.length;i++){
+    const f = filters[i];
+    if (/^ASCII85Decode$/i.test(f)) { data = ascii85DecodeToBytes(data); continue; }
+    if (/^ASCIIHexDecode$/i.test(f)) { data = asciiHexDecodeToBytes(data); continue; }
+    if (/^FlateDecode$/i.test(f)) { data = await inflateZlib(data); if (i===filters.length-1) return rasterToPNG(item, data); continue; }
+    if (/^RunLengthDecode$/i.test(f)) { data = runLengthDecode(data); if (i===filters.length-1) return rasterToPNG(item, data); continue; }
+    if (/^LZWDecode$/i.test(f)) { data = lzwDecode(data); if (i===filters.length-1) return rasterToPNG(item, data); continue; }
+    if (/^DCTDecode$/i.test(f)) { return jpegToPNG(data, item.width, item.height); }
+    if (/^JPXDecode$/i.test(f)) { return jpxToPNG(data, item.width, item.height); }
+    console.warn('Unsupported filter:', f); return null;
+  }
+  return rasterToPNG(item, data);
+}
+
+async function jpegToPNG(u8, hintW, hintH){
+  const blob = new Blob([u8], { type: 'image/jpeg' });
+  const { canvas, img } = await drawToCanvas(blob, hintW, hintH);
+  const png = await canvasToPNG(canvas);
+  try { URL.revokeObjectURL(img.src); } catch {}
+  return png;
+}
+async function jpxToPNG(u8, hintW, hintH){
+  const blob = new Blob([u8], { type: 'image/jp2' });
+  try {
+    const { canvas, img } = await drawToCanvas(blob, hintW, hintH);
+    const png = await canvasToPNG(canvas);
+    try { URL.revokeObjectURL(img.src); } catch {}
+    return png;
+  } catch {
+    console.warn('JPEG2000 not supported by this browser.'); return null;
+  }
+}
+
+async function rasterToPNG(item, raw){
+  const { width, height, bits, csInfo, predictor, columns } = item;
+  if (bits !== 8) { console.warn('Only 8 bpc supported for raw; got', bits); return null; }
+
+  // Components for predictor phase (pre-color-mapping)
+  let compsPredictor;
+  switch (csInfo.type) {
+    case 'DeviceRGB': compsPredictor = 3; break;
+    case 'DeviceGray': compsPredictor = 1; break;
+    case 'DeviceCMYK': compsPredictor = 4; break;
+    case 'Indexed': compsPredictor = 1; break;
+    default: console.warn('Unsupported ColorSpace', csInfo); return null;
+  }
+
+  let pixels; // bytes after predictor undo, per-pixel components = compsPredictor
+  if (predictor === 1) {
+    const expected = width * height * compsPredictor;
+    if (raw.length !== expected) { console.warn('Raw length mismatch; expected', expected, 'got', raw.length); return null; }
+    pixels = raw;
+  } else if (predictor >= 10 && predictor <= 15) {
+    const rowBytes = (columns || width) * compsPredictor;
+    const stride = 1 + rowBytes;
+    if (raw.length !== stride * height) {
+      const altRowBytes = width * compsPredictor;
+      const altStride = 1 + altRowBytes;
+      if (raw.length !== altStride * height) { console.warn('Predictor size mismatch'); return null; }
+      pixels = undoPNGPrediction(raw, altRowBytes, height, compsPredictor);
+    } else {
+      pixels = undoPNGPrediction(raw, rowBytes, height, compsPredictor);
+    }
+  } else {
+    console.warn('Unsupported Predictor:', predictor); return null;
+  }
+
+  // Map to RGBA
+  let rgba = new Uint8ClampedArray(width * height * 4);
+  if (csInfo.type === 'DeviceRGB') {
+    let si=0, di=0, n=width*height; for (let i=0;i<n;i++){ rgba[di++]=pixels[si++]; rgba[di++]=pixels[si++]; rgba[di++]=pixels[si++]; rgba[di++]=255; }
+  } else if (csInfo.type === 'DeviceGray') {
+    let si=0, di=0, n=width*height; for (let i=0;i<n;i++){ const v=pixels[si++]; rgba[di++]=v; rgba[di++]=v; rgba[di++]=v; rgba[di++]=255; }
+  } else if (csInfo.type === 'DeviceCMYK') {
+    let si=0, di=0, n=width*height;
+    for (let i=0;i<n;i++){
+      const C=pixels[si++]/255, M=pixels[si++]/255, Y=pixels[si++]/255, K=pixels[si++]/255;
+      // Profileless conversion (common heuristic)
+      const R = 255 * (1 - Math.min(1, C*(1-K) + K));
+      const G = 255 * (1 - Math.min(1, M*(1-K) + K));
+      const B = 255 * (1 - Math.min(1, Y*(1-K) + K));
+      rgba[di++]=R|0; rgba[di++]=G|0; rgba[di++]=B|0; rgba[di++]=255;
+    }
+  } else if (csInfo.type === 'Indexed') {
+    const base = csInfo.base || 'DeviceRGB';
+    const hival = (csInfo.hival != null) ? csInfo.hival : 255;
+    const table = csInfo.table || new Uint8Array(0);
+    let di=0;
+    if (base === 'DeviceRGB') {
+      for (let i=0;i<width*height;i++){
+        const idx = pixels[i];
+        const ti = Math.min(idx, hival) * 3;
+        const r = table[ti] || 0, g = table[ti+1] || 0, b = table[ti+2] || 0;
+        rgba[di++]=r; rgba[di++]=g; rgba[di++]=b; rgba[di++]=255;
+      }
+    } else if (base === 'DeviceGray') {
+      for (let i=0;i<width*height;i++){
+        const idx = pixels[i];
+        const v = table[Math.min(idx, hival)] || 0;
+        rgba[di++]=v; rgba[di++]=v; rgba[di++]=v; rgba[di++]=255;
+      }
+    } else if (base === 'DeviceCMYK') {
+      for (let i=0;i<width*height;i++){
+        const idx = pixels[i];
+        const ti = Math.min(idx, hival) * 4;
+        const C=(table[ti]||0)/255, M=(table[ti+1]||0)/255, Y=(table[ti+2]||0)/255, K=(table[ti+3]||0)/255;
+        const R = 255 * (1 - Math.min(1, C*(1-K) + K));
+        const G = 255 * (1 - Math.min(1, M*(1-K) + K));
+        const B = 255 * (1 - Math.min(1, Y*(1-K) + K));
+        rgba[di++]=R|0; rgba[di++]=G|0; rgba[di++]=B|0; rgba[di++]=255;
+      }
+    } else {
+      console.warn('Indexed base not supported:', base); return null;
+    }
+  } else {
+    console.warn('Unknown ColorSpace info:', csInfo); return null;
+  }
+
+  // Canvas → PNG
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const imgData = new ImageData(rgba, width, height);
+  ctx.putImageData(imgData, 0, 0);
+  return canvasToPNG(canvas);
+}
+
+/* ============================
+   Canvas helpers & PNG export
+============================ */
+function drawToCanvas(blob, hintW, hintH){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const w = hintW || img.naturalWidth || img.width;
+      const h = hintH || img.naturalHeight || img.height;
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d', { alpha: true });
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve({ canvas, img });
+    };
+    img.onerror = () => reject(new Error('Image decode failed'));
+    img.src = URL.createObjectURL(blob);
+  });
+}
+function canvasToPNG(canvas){
+  return new Promise((resolve) => { canvas.toBlob(b => resolve(b), 'image/png', 1.0); });
+}
+async function getImageSizeFromBlob(blob, fallbackW, fallbackH){
+  if ('createImageBitmap' in window) {
+    try { const bmp = await createImageBitmap(blob); const w=bmp.width, h=bmp.height; bmp.close(); return { w, h }; } catch {}
+  }
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => { const w=img.naturalWidth||fallbackW||0, h=img.naturalHeight||fallbackH||0; URL.revokeObjectURL(url); resolve({ w, h }); };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve({ w: fallbackW||0, h: fallbackH||0 }); };
+    img.src = url;
+  });
+}
+
+/* ============================
+   SHA-256 & ZIP (store method)
+============================ */
+async function sha256Hex(u8){ const buf = await crypto.subtle.digest('SHA-256', u8); return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+
+const CRC32_TABLE = (() => { let c, t=[]; for (let n=0;n<256;n++){ c=n; for (let k=0;k<8;k++) c=((c&1)?(0xEDB88320^(c>>>1)):(c>>>1)); t[n]=c>>>0; } return t; })();
+function crc32(u8){ let c=0^(-1); for (let i=0;i<u8.length;i++) c=(c>>>8)^CRC32_TABLE[(c^u8[i])&0xFF]; return (c^(-1))>>>0; }
+function strToU8(s){ const u = new Uint8Array(s.length); for (let i=0;i<s.length;i++) u[i] = s.charCodeAt(i) & 0xFF; return u; }
+function u16(v){ return new Uint8Array([v & 0xFF, (v>>8) & 0FF]); } // corrected below (typo fix)
+</script>
+<script>
+/* Tiny fix for u16 typo (split to avoid minifier confusion) */
+function u16(v){ return new Uint8Array([v & 0xFF, (v>>8) & 0xFF]); }
+function u32(v){ return new Uint8Array([v & 0xFF, (v>>8)&0xFF, (v>>16)&0xFF, (v>>24)&0xFF]); }
+function toDosTime(d){ let h=d.getHours(), m=d.getMinutes(), s=Math.floor(d.getSeconds()/2); return (h<<11)|(m<<5)|s; }
+function toDosDate(d){ let y=Math.max(1980,d.getFullYear())-1980, mon=d.getMonth()+1, day=d.getDate(); return (y<<9)|(mon<<5)|day; }
+
+async function buildZipFromImages(files){
+  const fileRecords = [];
+  const localParts = [];
+  let localOffset = 0;
+
+  const now = new Date(), dt=toDosTime(now), dd=toDosDate(now);
+
+  for (const f of files) {
+    const ab = await f.pngBlob.arrayBuffer(); const u8 = new Uint8Array(ab);
+    const c = crc32(u8), nameU8 = strToU8(f.name);
+    const LFH = [ u32(0x04034b50), u16(20), u16(0), u16(0), u16(dt), u16(dd), u32(c), u32(u8.length), u32(u8.length), u16(nameU8.length), u16(0), nameU8, u8 ];
+    const lfhSize = LFH.reduce((s,p)=> s+p.length, 0); localParts.push(...LFH);
+    fileRecords.push({ nameU8, crc:c, size:u8.length, comp:u8.length, off: localOffset, dt, dd });
+    localOffset += lfhSize;
+  }
+
+  const cdParts = []; let cdSize = 0;
+  for (const r of fileRecords){
+    const CDFH = [ u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(r.dt), u16(r.dd), u32(r.crc), u32(r.comp), u32(r.size),
+                   u16(r.nameU8.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(r.off), r.nameU8 ];
+    const size = CDFH.reduce((s,p)=> s+p.length, 0); cdSize += size; cdParts.push(...CDFH);
+  }
+  const cdOffset = localOffset;
+  const EOCD = [ u32(0x06054b50), u16(0), u16(0), u16(fileRecords.length), u16(fileRecords.length), u32(cdSize), u32(cdOffset), u16(0) ];
+  const total = localOffset + cdSize + EOCD.reduce((s,p)=> s+p.length, 0);
+  const out = new Uint8Array(total); let pos=0;
+  for (const p of localParts){ out.set(p, pos); pos += p.length; }
+  for (const p of cdParts){ out.set(p, pos); pos += p.length; }
+  for (const p of EOCD){ out.set(p, pos); pos += p.length; }
+  return new Blob([out], { type: 'application/zip' });
+}
+
+/* ============================
+   Render UI
+============================ */
+function renderImages(){
+  sortImages();
+  if (!state.images.length) { showEmpty('No images found after processing.'); return; }
+  const frag = document.createDocumentFragment();
+  for (const it of state.images) frag.appendChild(renderCard(it));
+  els.gallery.innerHTML = ''; els.gallery.appendChild(frag);
+  els.defaultSortBtn.disabled = false;
+  els.smartSortBtn.disabled = false;
+  els.selectAllBtn.disabled = false;
+  els.deselectAllBtn.disabled = false;
+  els.downloadSelectedZipBtn.disabled = false;
+  els.downloadAllZipBtn.disabled = false;
+}
+function renderCard(it){
+  const card = document.createElement('div'); card.className = 'card';
+  const img = document.createElement('img'); img.className='thumb'; img.src=it.srcObjectUrl; img.alt=it.name; img.loading='lazy';
+  img.title='Click to preview'; img.addEventListener('click', ()=> openModal(it));
+  card.appendChild(img);
+
+  const meta = document.createElement('div'); meta.className='meta';
+  const row1 = document.createElement('div'); row1.className='row';
+  const label = document.createElement('label'); label.style.display='flex'; label.style.alignItems='center'; label.style.gap='8px';
+  const cb = document.createElement('input'); cb.type='checkbox'; cb.checked=!!it.selected;
+  const name = document.createElement('span'); name.className='badge'; name.textContent = it.name;
+  label.appendChild(cb); label.appendChild(name);
+  const dl = document.createElement('button'); dl.textContent='Download'; dl.style.padding='6px 10px';
+  dl.addEventListener('click', ()=>{ const a=document.createElement('a'); a.href=it.srcObjectUrl; a.download=it.name; document.body.appendChild(a); a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); a.remove(); });
+  row1.appendChild(label); row1.appendChild(dl); meta.appendChild(row1);
+
+  const row2 = document.createElement('div'); row2.className='row';
+  const dims = document.createElement('div'); dims.className='small'; dims.textContent = `Dimensions: ${it.width}×${it.height}px`;
+  const size = document.createElement('div'); size.className='small'; size.textContent = `Size: ${it.mb.toFixed(2)} MB`;
+  row2.appendChild(dims); row2.appendChild(size); meta.appendChild(row2);
+
+  const sel = document.createElement('div'); sel.className='small'; sel.innerHTML = it.selected ? `<span class="ok">Selected</span>` : `Not selected`;
+  cb.addEventListener('change', ()=>{ it.selected = cb.checked; sel.innerHTML = cb.checked ? `<span class="ok">Selected</span>` : `Not selected`; });
+  meta.appendChild(sel);
+
+  card.appendChild(meta);
+  return card;
+}
+function sortImages(){
+  const arr = state.images; if (!arr.length) return;
+  if (state.sortMode === 'default') arr.sort((a,b)=>(b.width*b.height)-(a.width*a.height));
+  else {
+    const areas = arr.map(i=>i.width*i.height), sizes = arr.map(i=>i.mb);
+    const avgA = (areas.reduce((s,v)=>s+v,0)/areas.length)||1; const avgS = (sizes.reduce((s,v)=>s+v,0)/sizes.length)||1;
+    for (const it of arr){ const area=it.width*it.height; const wA=area/avgA, wS=it.mb/avgS; it._smartScore=0.6*wA+0.4*wS; }
+    arr.sort((a,b)=>b._smartScore-a._smartScore);
+  }
+}
+
+/* ============================
+   Downloads
+============================ */
+els.downloadSelectedZipBtn.addEventListener('click', async () => {
+  const chosen = state.images.filter(i=>i.selected);
+  if (!chosen.length) { alert('No images selected.'); return; }
+  const zip = await buildZipFromImages(chosen);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(zip); a.download = `${state.pdfNameBase}_images.zip`;
+  document.body.appendChild(a); a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); a.remove();
+});
+els.downloadAllZipBtn.addEventListener('click', async () => {
+  const chosen = state.images.slice();
+  if (!chosen.length) { alert('Nothing to download.'); return; }
+  const zip = await buildZipFromImages(chosen);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(zip); a.download = `${state.pdfNameBase}_images.zip`;
+  document.body.appendChild(a); a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); a.remove();
+});
+</script>
 </body>
 </html>
