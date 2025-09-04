@@ -170,7 +170,7 @@
   </section>
 
   <section class="footer-note">
-    <div><b>Notes & Limitations:</b> Handles embedded <i>and inline</i> images. JPEG/JPX good; Flate with PNG predictors supported; LZW added. Complex color spaces (Indexed/ICCBased/CMYK) are skipped.</div>
+    <div><b>Notes & Limitations:</b> Handles embedded <i>and inline</i> images. JPEG/JPX good; Flate with PNG predictors supported; LZW added. Complex color spaces (Indexed/ICCBased/CMYK) are skipped (warn in console).</div>
   </section>
 
 </main>
@@ -195,11 +195,11 @@
 <script>
 /* ===========================================================
    PDF Image Extractor – robust, offline
+   - Balanced outer dictionary parsing for streams (fixes /Length & filters).
    - Stream slicing via /Length (resolves indirect).
    - Filter chaining: ASCII85, ASCIIHex, Flate, LZW, DCT, JPX.
-   - PNG predictors 10–15 (with /Columns).
-   - Extracts embedded /Subtype /Image AND inline BI/ID/EI images
-     found in decoded content streams.
+   - PNG predictors 10–15 (with /Columns) for 8bpc DeviceRGB/DeviceGray.
+   - Extracts embedded /Subtype /Image AND inline BI/ID/EI images.
 =========================================================== */
 
 const els = {
@@ -223,9 +223,9 @@ let state = {
   pdfNameBase: 'images',
   raw: null,      // Uint8Array
   text: null,     // latin1 text
-  objects: [],    // { obj, gen, startIndex, endIndex, dictStr, streamStart, streamEnd, hasStream, srcSlice }
-  objMap: new Map(), // "obj gen" -> object index
-  images: [],     // extracted images (PNG blobs)
+  objects: [],    // { obj, gen, startIndex, endIndex, dictRange:[a,b], dictStr, streamStart, streamEnd }
+  objMap: new Map(),
+  images: [],
   removedDuplicates: 0,
   sortMode: 'default',
 };
@@ -254,6 +254,7 @@ els.startBtn.addEventListener('click', async () => {
     state.raw = new Uint8Array(await state.pdfFile.arrayBuffer());
     state.text = new TextDecoder('latin1').decode(state.raw);
     indexObjects(state.text);
+
     const items = await collectAllImages();
     if (!items.length) {
       showEmpty('No images found in this PDF.');
@@ -304,7 +305,52 @@ function finalizeStats(){
   els.stats.innerHTML = `Images: <b>${state.images.length}</b> &nbsp; | &nbsp; Removed duplicates: <b>${state.removedDuplicates}</b>`;
 }
 
-/* ============== Object indexing & slicing ================= */
+/* ============================
+   Balanced dictionary parsing
+============================ */
+function findBalancedDictRange(block, fromIdx=0){
+  // Find first '<<' then scan for matching '>>', handling nested << >> and strings/comments.
+  const n = block.length;
+  let i = block.indexOf('<<', fromIdx);
+  if (i < 0) return null;
+  let depth = 0;
+  let j = i;
+  let inStr = false, strParen = 0, inHexStr = false, inComment = false;
+  while (j < n - 1){
+    const a = block[j], b = block[j+1];
+    // handle comment
+    if (!inStr && !inHexStr && a === '%' && !inComment) { inComment = true; j++; continue; }
+    if (inComment) { if (a === '\n' || a === '\r') inComment = false; j++; continue; }
+
+    // string literal (...)
+    if (!inHexStr && a === '('){
+      inStr = true; strParen = 1; j++; continue;
+    }
+    if (inStr){
+      if (a === '\\') { j += 2; continue; } // escaped char
+      if (a === '(') strParen++;
+      if (a === ')') { strParen--; if (strParen === 0) inStr = false; }
+      j++; continue;
+    }
+
+    // hex string <...> (but not dictionary open '<<')
+    if (!inHexStr && a === '<' && b !== '<'){ inHexStr = true; j++; continue; }
+    if (inHexStr){
+      if (a === '>') inHexStr = false;
+      j++; continue;
+    }
+
+    // dictionary tokens
+    if (a === '<' && b === '<'){ depth++; j += 2; continue; }
+    if (a === '>' && b === '>'){
+      depth--; j += 2;
+      if (depth === 0) return [i, j];
+      continue;
+    }
+    j++;
+  }
+  return null;
+}
 
 function indexObjects(text){
   state.objects = [];
@@ -317,40 +363,42 @@ function indexObjects(text){
     const endObjIdx = text.indexOf('endobj', start);
     if (endObjIdx === -1) break;
     const block = text.slice(start, endObjIdx + 6);
-    const dictMatch = /<<(.*?)>>/s.exec(block);
-    const dictStr = dictMatch ? dictMatch[1] : '';
-    // locate stream
-    const streamIdx = block.indexOf('stream', dictMatch ? dictMatch.index + dictMatch[0].length : 0);
-    let hasStream = false, streamStart = -1, streamEnd = -1;
-    if (streamIdx !== -1) {
-      hasStream = true;
-      let dataStartInBlock = streamIdx + 6;
-      if (block[dataStartInBlock] === '\r' && block[dataStartInBlock+1] === '\n') dataStartInBlock += 2;
-      else if (block[dataStartInBlock] === '\n') dataStartInBlock += 1;
-      const absBlockStart = start;
-      const absStart = absBlockStart + dataStartInBlock;
 
-      // /Length (direct or indirect)
-      let length = pickLastInt(dictStr, 'Length');
-      if (length == null) {
-        const lenRef = pickRef(dictStr, 'Length');
-        length = getObjectNumericValue(lenRef);
-      }
-      if (length != null && Number.isFinite(length) && length >= 0) {
-        streamStart = absStart;
-        streamEnd = absStart + length;
-        if (streamEnd > state.raw.length) streamEnd = state.raw.length;
-      } else {
-        // fallback: find endstream
-        const relEnd = block.indexOf('endstream', dataStartInBlock);
-        if (relEnd !== -1) {
+    const dictRange = findBalancedDictRange(block);
+    let dictStr = '';
+    let streamStart = -1, streamEnd = -1;
+    if (dictRange){
+      const [a,b] = dictRange;
+      dictStr = block.slice(a+2, b-2);
+      // locate stream only after the full dictionary
+      const streamIdx = block.indexOf('stream', b);
+      if (streamIdx !== -1){
+        let dataStart = streamIdx + 6;
+        if (block[dataStart] === '\r' && block[dataStart+1] === '\n') dataStart += 2;
+        else if (block[dataStart] === '\n') dataStart += 1;
+        const absStart = start + dataStart;
+
+        // read /Length (direct or indirect)
+        let length = pickLastInt(dictStr, 'Length');
+        if (length == null) {
+          const lenRef = pickRef(dictStr, 'Length');
+          length = getObjectNumericValue(lenRef);
+        }
+        if (length != null && Number.isFinite(length) && length >= 0){
           streamStart = absStart;
-          streamEnd = start + relEnd;
+          streamEnd = Math.min(absStart + length, state.raw.length);
+        } else {
+          // fallback to endstream search
+          const relEnd = block.indexOf('endstream', dataStart);
+          if (relEnd !== -1) {
+            streamStart = absStart;
+            streamEnd = start + relEnd;
+          }
         }
       }
     }
 
-    const rec = { obj, gen, startIndex: start, endIndex: endObjIdx + 6, dictStr, hasStream, streamStart, streamEnd };
+    const rec = { obj, gen, startIndex: start, endIndex: endObjIdx+6, dictRange, dictStr, streamStart, streamEnd };
     state.objMap.set(`${obj} ${gen}`, rec);
     state.objects.push(rec);
     reObj.lastIndex = endObjIdx + 6;
@@ -366,8 +414,7 @@ function pickLastInt(source, name){
 function pickRef(source, name){
   const re = new RegExp(`/${name}\\s+(\\d+)\\s+(\\d+)\\s+R`);
   const m = re.exec(source);
-  if (!m) return null;
-  return { obj: parseInt(m[1],10), gen: parseInt(m[2],10) };
+  return m ? { obj: parseInt(m[1],10), gen: parseInt(m[2],10) } : null;
 }
 function pickArrayNames(source, key){
   const re = new RegExp(`/${key}\\s+\\[([^\\]]+)\\]`);
@@ -385,8 +432,8 @@ function getObjectNumericValue(ref){
   const obj = state.objMap.get(`${ref.obj} ${ref.gen}`);
   if (!obj) return null;
   const block = state.text.slice(obj.startIndex, obj.endIndex);
-  const m = block.match(/(\d+)/);
-  return m ? parseInt(m[1],10) : null;
+  const num = (block.match(/(\d+)/) || [])[1];
+  return num ? parseInt(num,10) : null;
 }
 
 /* ============== Image collection (embedded + inline) ============== */
@@ -395,17 +442,23 @@ async function collectAllImages(){
   const embedded = [];
   const candidatesForInline = [];
 
-  // 1) Embedded /Subtype /Image streams
   for (const rec of state.objects) {
-    if (!rec.hasStream || rec.streamStart < 0 || rec.streamEnd <= rec.streamStart) continue;
     const dict = rec.dictStr || '';
-    if (/\/Subtype\s*\/Image/.test(dict)) {
-      // gather info
+    const hasStream = rec.streamStart >= 0 && rec.streamEnd > rec.streamStart;
+
+    if (hasStream && /\/Subtype\s*\/Image\b/.test(dict)) {
       const width  = pickLastInt(dict, 'Width');
       const height = pickLastInt(dict, 'Height');
       const bits   = pickLastInt(dict, 'BitsPerComponent') || 8;
-      let cs       = pickName(dict, 'ColorSpace') || 'DeviceRGB';
-      let filters  = pickArrayNames(dict, 'Filter');
+
+      let cs = pickName(dict, 'ColorSpace') || 'DeviceRGB';
+      // Allow simple array form: [/ICCBased n 0 R] etc. (skip complex)
+      if (!/^Device(RGB|Gray)$/.test(cs)) {
+        console.warn('Skipping non-RGB/Gray image (ColorSpace=', cs, ')');
+        continue;
+      }
+
+      let filters = pickArrayNames(dict, 'Filter');
       if (!filters.length) {
         const single = pickName(dict, 'Filter'); if (single) filters = [single];
       }
@@ -415,38 +468,28 @@ async function collectAllImages(){
 
       const bytes = state.raw.subarray(rec.streamStart, rec.streamEnd);
       embedded.push({ kind:'embedded', width, height, bits, cs, filters, predictor, colors, columns, bytes });
-    } else {
-      // not an image XObject; but might be a page/content stream – scan for inline images later
-      candidatesForInline.push(rec);
+      continue;
     }
+
+    // Decode possible content streams for inline images
+    if (hasStream) candidatesForInline.push(rec);
   }
 
-  // 2) Inline images inside decoded content streams
+  // Inline images from content streams (decode first if filtered)
   const inlineFound = [];
-  let scanned = 0;
   for (const rec of candidatesForInline) {
-    scanned++;
-    // progress on scanning streams (not total images)
-    if (scanned % 10 === 0) updateProgress(5, `Scanning content streams… (${scanned}/${candidatesForInline.length})`);
-
-    const bytes = state.raw.subarray(rec.streamStart, rec.streamEnd);
-    if (!bytes || !bytes.length) continue;
-
-    // Apply filter chain (rare but some content streams are Flate/ASCII85/etc.)
-    let filters = pickArrayNames(rec.dictStr, 'Filter');
+    let data = state.raw.subarray(rec.streamStart, rec.streamEnd);
+    const dict = rec.dictStr || '';
+    let filters = pickArrayNames(dict, 'Filter');
     if (!filters.length) {
-      const single = pickName(rec.dictStr, 'Filter'); if (single) filters = [single];
+      const single = pickName(dict, 'Filter'); if (single) filters = [single];
     }
-    let data = bytes;
     for (const f of (filters || [])) {
       if (/^ASCII85Decode$/i.test(f)) { data = ascii85DecodeToBytes(data); continue; }
       if (/^ASCIIHexDecode$/i.test(f)) { data = asciiHexDecodeToBytes(data); continue; }
       if (/^FlateDecode$/i.test(f)) { data = await inflateZlib(data); continue; }
       if (/^LZWDecode$/i.test(f)) { data = lzwDecode(data); continue; }
-      // other filters on content streams are very rare; skip if unknown
     }
-
-    // Scan this decoded content stream for inline images
     const inlines = extractInlineImagesFromContent(data);
     inlineFound.push(...inlines);
   }
@@ -457,76 +500,55 @@ async function collectAllImages(){
 /* ============== Inline image parser (BI/ID/EI) ==================== */
 
 function extractInlineImagesFromContent(u8){
-  // PDF operator syntax: BI (begin inline image), key/value pairs, ID (data begins), <binary>, EI
-  // We search byte-wise to avoid false positives from binary content.
   const isWs = b => b===9||b===10||b===12||b===13||b===32;
   const out = [];
   let i = 0, n = u8.length;
 
-  while (i < n) {
-    // find 'B''I' with word boundary
-    if (u8[i] === 0x42 && u8[i+1] === 0x49 && (i===0 || isWs(u8[i-1])) && isWs(u8[i+2])) {
-      i += 2; // after BI
-      while (i<n && isWs(u8[i])) i++;
+  while (i < n - 3) {
+    if (u8[i]===0x42 && u8[i+1]===0x49 && (i===0 || isWs(u8[i-1])) && isWs(u8[i+2])) { // 'BI'
+      i += 2; while (i<n && isWs(u8[i])) i++;
 
-      // parse dict tokens until 'ID'
+      // parse dict bytes until 'ID'
       const dictStart = i;
-      // find ' I''D' token (with ws boundaries)
       let idPos = -1;
-      // We can find ASCII " ID" pattern: ensure word boundary
-      for (let j=i; j<n-2; j++){
-        if (isWs(u8[j]) && u8[j+1]===0x49 && u8[j+2]===0x44 && isWs(u8[j+3]||32)) { idPos = j+1; break; }
+      for (let j=i; j<n-3; j++){
+        if (isWs(u8[j]) && u8[j+1]===0x49 && u8[j+2]===0x44 && isWs(u8[j+3])) { idPos = j+1; break; } // ' ID '
       }
       if (idPos === -1) break;
 
-      const dictBytes = u8.subarray(dictStart, idPos-1); // bytes between BI and ID (excluding trailing ws)
-      // Move cursor to data start (after 'ID' and one whitespace if present)
+      const dictBytes = u8.subarray(dictStart, idPos-1);
       i = idPos + 2;
       if (i<n && isWs(u8[i])) i++;
 
-      // Now read data until ' EI' with boundaries; keep track carefully
       const dataStart = i;
       let dataEnd = -1;
-      // Heuristic: look for whitespace + 'E''I' + non-letter (ws or end) boundary
-      for (let j=i; j<n-2; j++){
-        if (isWs(u8[j]) && u8[j+1]===0x45 && u8[j+2]===0x49 && (j+3>=n || isWs(u8[j+3]))) {
-          dataEnd = j; break;
-        }
+      for (let j=i; j<n-3; j++){
+        if (isWs(u8[j]) && u8[j+1]===0x45 && u8[j+2]===0x49 && (j+3>=n || isWs(u8[j+3]))) { dataEnd = j; break; } // ' EI'
       }
       if (dataEnd === -1) break;
 
       const dataBytes = u8.subarray(dataStart, dataEnd);
-      i = dataEnd + 3; // skip EI
+      i = dataEnd + 3;
 
-      // Decode dictionary
       const dictStr = new TextDecoder('latin1').decode(dictBytes);
-      // Keys of interest: /W /H /BPC /CS (/DeviceRGB=/RGB, /G=Gray) /F or /Filter (name or array) /DP DecodeParms (Predictor/Columns/Colors)
       const width  = pickLastInt(dictStr, 'W') || pickLastInt(dictStr, 'Width');
       const height = pickLastInt(dictStr, 'H') || pickLastInt(dictStr, 'Height');
       const bits   = pickLastInt(dictStr, 'BPC') || pickLastInt(dictStr, 'BitsPerComponent') || 8;
-
       let cs = pickName(dictStr, 'CS') || pickName(dictStr, 'ColorSpace') || 'DeviceRGB';
       if (cs === 'RGB') cs = 'DeviceRGB';
       if (cs === 'G') cs = 'DeviceGray';
+      if (!/^Device(RGB|Gray)$/.test(cs)) { console.warn('Skip inline non-RGB/Gray', cs); continue; }
 
       let filters = pickArrayNames(dictStr, 'F') || pickArrayNames(dictStr, 'Filter');
       if (!filters.length) {
         const singleF = pickName(dictStr, 'F') || pickName(dictStr, 'Filter');
         if (singleF) filters = [singleF];
       }
-
       const predictor = pickLastInt(dictStr, 'Predictor') || 1;
-      const colors = pickLastInt(dictStr, 'Colors') || (cs==='DeviceRGB' ? 3 : 1);
+      const colors = pickLastInt(dictStr, 'Colors') || (cs==='DeviceRGB'?3:1);
       const columns = pickLastInt(dictStr, 'Columns') || width;
 
-      out.push({
-        kind: 'inline',
-        width, height, bits, cs,
-        filters,
-        predictor, colors, columns,
-        bytes: dataBytes
-      });
-
+      out.push({ kind:'inline', width, height, bits, cs, filters, predictor, colors, columns, bytes: dataBytes });
       continue;
     }
     i++;
@@ -580,7 +602,6 @@ async function convertOneToPNG(item){
   const filters = (item.filters && item.filters.length) ? item.filters.slice() : [];
 
   if (!filters.length) {
-    // no filters: assume raw raster
     return rawRasterToPNG(item, data);
   }
 
@@ -592,16 +613,14 @@ async function convertOneToPNG(item){
     if (/^LZWDecode$/i.test(f)) { data = lzwDecode(data); if (i===filters.length-1) return rawRasterToPNG(item, data); continue; }
     if (/^DCTDecode$/i.test(f)) { return jpegToPNG(data, item.width, item.height); }
     if (/^JPXDecode$/i.test(f)) { return jpxToPNG(data, item.width, item.height); }
-    // Unknown filter – bail out safely
     console.warn('Unsupported filter:', f); return null;
   }
-  // Only ASCII* filters present ➜ assume raw raster now
   return rawRasterToPNG(item, data);
 }
 
 async function jpegToPNG(u8, hintW, hintH){
   const blob = new Blob([u8], { type: 'image/jpeg' });
-  const { canvas, ctx, img } = await drawToCanvas(blob, hintW, hintH);
+  const { canvas, img } = await drawToCanvas(blob, hintW, hintH);
   const png = await canvasToPNG(canvas);
   try { URL.revokeObjectURL(img.src); } catch {}
   return png;
@@ -609,7 +628,7 @@ async function jpegToPNG(u8, hintW, hintH){
 async function jpxToPNG(u8, hintW, hintH){
   const blob = new Blob([u8], { type: 'image/jp2' });
   try {
-    const { canvas, ctx, img } = await drawToCanvas(blob, hintW, hintH);
+    const { canvas, img } = await drawToCanvas(blob, hintW, hintH);
     const png = await canvasToPNG(canvas);
     try { URL.revokeObjectURL(img.src); } catch {}
     return png;
@@ -632,7 +651,6 @@ async function rawRasterToPNG(item, raw){
     const rowBytes = (columns||width) * comps;
     const stride = 1 + rowBytes;
     if (raw.length !== stride * height) {
-      // try fallback columns=width
       const altRowBytes = width * comps;
       const altStride = 1 + altRowBytes;
       if (raw.length !== altStride * height) { console.warn('Predictor size mismatch'); return null; }
@@ -644,19 +662,17 @@ async function rawRasterToPNG(item, raw){
     console.warn('Unsupported Predictor:', predictor); return null;
   }
 
-  // Draw to canvas ➜ PNG
   const canvas = document.createElement('canvas');
   canvas.width = width; canvas.height = height;
   const ctx = canvas.getContext('2d');
   const imgData = ctx.createImageData(width, height);
   const dst = imgData.data;
-
   if (comps === 3) {
-    let si=0, di=0, n = width*height;
-    for (let i=0;i<n;i++){ dst[di++] = pixels[si++]; dst[di++] = pixels[si++]; dst[di++] = pixels[si++]; dst[di++] = 255; }
+    let si=0, di=0, n=width*height;
+    for (let i=0;i<n;i++){ dst[di++]=pixels[si++]; dst[di++]=pixels[si++]; dst[di++]=pixels[si++]; dst[di++]=255; }
   } else {
-    let si=0, di=0, n = width*height;
-    for (let i=0;i<n;i++){ const v = pixels[si++]; dst[di++]=v; dst[di++]=v; dst[di++]=v; dst[di++]=255; }
+    let si=0, di=0, n=width*height;
+    for (let i=0;i<n;i++){ const v=pixels[si++]; dst[di++]=v; dst[di++]=v; dst[di++]=v; dst[di++]=255; }
   }
   ctx.putImageData(imgData, 0, 0);
   return canvasToPNG(canvas);
@@ -709,79 +725,50 @@ async function inflateZlib(u8){
   } else { throw new Error('DecompressionStream unsupported'); }
 }
 
-/* ---- LZWDecode (PDF variant, early change & CLEAR/EOD codes) ---- */
+/* ---- LZWDecode (PDF variant) ---- */
 function lzwDecode(data){
-  // Adapted minimal LZW for PDF (no TIFF differencing; PDF's LZW stream may have predictor handled later)
   let pos = 0, bitPos = 0;
   function readBits(n){
     let val = 0;
     for (let i=0;i<n;i++){
+      if (pos >= data.length) return null;
       const byte = data[pos];
-      val |= ((byte >> (7 - bitPos)) & 1) << (n - i - 1);
+      val = (val << 1) | ((byte >> (7 - bitPos)) & 1);
       bitPos++;
       if (bitPos === 8){ bitPos = 0; pos++; }
     }
     return val;
   }
-  const CLEAR = 256, EOD = 257;
-  let codeSize = 9;
-  let dict = [];
-  for (let i=0;i<256;i++) dict[i] = new Uint8Array([i]);
-  dict[CLEAR] = null; dict[EOD] = null;
-  let prev = null;
-  const out = [];
-  function pushBytes(u8){ for (let i=0;i<u8.length;i++) out.push(u8[i]); }
-  while (pos < data.length){
-    const code = readSafe(codeSize); if (code == null) break;
-    if (code === CLEAR){
-      dict = []; for (let i=0;i<256;i++) dict[i] = new Uint8Array([i]);
-      dict[CLEAR]=null; dict[EOD]=null; codeSize = 9; prev = null; continue;
-    }
-    if (code === EOD) break;
+  const CLEAR=256, EOD=257;
+  let codeSize=9, dict=[], prev=null, out=[];
+  for (let i=0;i<256;i++) dict[i]=new Uint8Array([i]);
+  dict[CLEAR]=dict[EOD]=null;
+
+  function readCode(n){ let v=0; for (let i=0;i<n;i++){ const b=readBits(1); if (b===null) return null; v=(v<<1)|b; } return v; }
+  function concat(a,b){ const r=new Uint8Array(a.length+b.length); r.set(a); r.set(b,a.length); return r; }
+
+  while (true){
+    let code = readCode(codeSize); if (code===null) break;
+    if (code===CLEAR){ dict=[]; for (let i=0;i<256;i++) dict[i]=new Uint8Array([i]); dict[CLEAR]=dict[EOD]=null; codeSize=9; prev=null; continue; }
+    if (code===EOD) break;
 
     let entry;
-    if (dict[code]) {
-      entry = dict[code];
-    } else if (prev) {
-      // KwKwK case
-      const p = dict[prev]; entry = concatBytes(p, new Uint8Array([p[0]]));
-    } else {
-      entry = new Uint8Array([code]);
-    }
-    pushBytes(entry);
+    if (dict[code]) entry=dict[code];
+    else if (prev!=null) entry=concat(dict[prev], new Uint8Array([dict[prev][0]]));
+    else entry = new Uint8Array([code]);
 
-    if (prev != null) {
-      const p = dict[prev];
-      dict.push(concatBytes(p, new Uint8Array([entry[0]])));
-    }
+    out.push(...entry);
+    if (prev!=null) dict.push(concat(dict[prev], new Uint8Array([entry[0]])));
     prev = code;
-
-    if (dict.length === (1<<codeSize) && codeSize < 12) codeSize++;
+    if (dict.length === (1<<codeSize) && codeSize<12) codeSize++;
   }
   return new Uint8Array(out);
-
-  function readSafe(n){
-    let bitsLeft = n, val = 0;
-    while (bitsLeft > 0){
-      if (pos >= data.length) return null;
-      const remainingInByte = 8 - bitPos;
-      const take = Math.min(bitsLeft, remainingInByte);
-      const byte = data[pos];
-      const part = (byte >> (remainingInByte - take)) & ((1<<take)-1);
-      val = (val << take) | part;
-      bitPos += take;
-      if (bitPos === 8){ bitPos = 0; pos++; }
-      bitsLeft -= take;
-    }
-    return val;
-  }
-  function concatBytes(a,b){ const r = new Uint8Array(a.length+b.length); r.set(a,0); r.set(b,a.length); return r; }
 }
 
 /* ====== PNG predictor undo ====== */
 function undoPNGPrediction(inflated, rowBytes, rows, comps){
   const out = new Uint8Array(rowBytes * rows);
-  const bpp = comps; // 8bpc
+  const bpp = comps;
   let src = 0, dst = 0;
   const priorRow = new Uint8Array(rowBytes);
   for (let y=0; y<rows; y++){
@@ -803,8 +790,7 @@ function undoPNGPrediction(inflated, rowBytes, rows, comps){
           out[dst+x] = (inflated[src+x] + paeth(left, up, ul)) & 0xFF;
         }
         break;
-      default:
-        out.set(inflated.subarray(src, src+rowBytes), dst);
+      default: out.set(inflated.subarray(src, src+rowBytes), dst);
     }
     priorRow.set(out.subarray(dst, dst+rowBytes));
     src += rowBytes; dst += rowBytes;
@@ -824,7 +810,7 @@ function drawToCanvas(blob, hintW, hintH){
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d', { alpha: true });
       ctx.drawImage(img, 0, 0, w, h);
-      resolve({ canvas, ctx, img });
+      resolve({ canvas, img });
     };
     img.onerror = () => reject(new Error('Image decode failed'));
     img.src = URL.createObjectURL(blob);
@@ -896,6 +882,12 @@ function renderImages(){
   const frag = document.createDocumentFragment();
   for (const it of state.images) frag.appendChild(renderCard(it));
   els.gallery.innerHTML = ''; els.gallery.appendChild(frag);
+  els.defaultSortBtn.disabled = false;
+  els.smartSortBtn.disabled = false;
+  els.selectAllBtn.disabled = false;
+  els.deselectAllBtn.disabled = false;
+  els.downloadSelectedZipBtn.disabled = false;
+  els.downloadAllZipBtn.disabled = false;
 }
 function renderCard(it){
   const card = document.createElement('div'); card.className = 'card';
@@ -952,5 +944,6 @@ els.downloadAllZipBtn.addEventListener('click', async () => {
   document.body.appendChild(a); a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); a.remove();
 });
 </script>
+
 </body>
 </html>
