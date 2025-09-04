@@ -37,33 +37,41 @@
     background: var(--bg);
     border-bottom: 1px solid var(--border);
   }
-  .wrap {
-    max-width: 1100px; margin: 0 auto; padding: 16px;
-  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
   h1 { font-size: 20px; margin: 0 0 8px 0; letter-spacing: 0.3px; }
   .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   .spacer { flex: 1; }
-  button, label.btn, .toggle {
+
+  /* Buttons */
+  .btn, button, .toggle {
     background: var(--card); color: var(--text); border: 1px solid var(--border);
     padding: 10px 12px; border-radius: 12px; cursor: pointer; font-weight: 600;
     transition: transform .06s ease, background .2s ease, border .2s ease;
-    user-select: none;
+    user-select: none; text-decoration: none;
+    outline: none; box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
   }
-  button:hover, label.btn:hover { transform: translateY(-1px); }
+  .btn:hover, button:hover { transform: translateY(-1px); }
   button.primary { background: linear-gradient(180deg, var(--accent), #2aa3d6); color: #001218; border-color: transparent; }
   button.success { background: linear-gradient(180deg, var(--ok), #2dad78); color: #001b11; border-color: transparent; }
   button.warn { background: linear-gradient(180deg, var(--warn), #d7a13c); color: #2d1f00; border-color: transparent; }
+  button:focus, button:focus-visible,
+  .btn:focus, .btn:focus-visible,
+  .btn:active, button:active { outline: none !important; box-shadow: none !important; }
+
   input[type="file"] { display:none; }
   .hint { color: var(--muted); font-size: 12px; margin-top: -4px; }
+
   .panel {
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 16px; padding: 14px 14px;
+    border-radius: 16px; padding: 14px;
   }
   .progress {
     height: 12px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border);
   }
   .bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), #9bffd6); transition: width .15s ease; }
   .statline { display: flex; gap: 10px; align-items:center; font-size: 13px; color: var(--muted); }
+
   .grid {
     display: grid; gap: 14px;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -77,11 +85,9 @@
   }
   .meta { padding: 10px 12px; display: grid; gap: 6px; font-size: 13px; }
   .meta .row { justify-content: space-between; }
+
   .badge { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
-  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
-  .tooltip {
-    position: relative; display: inline-block;
-  }
+  .tooltip { position: relative; display: inline-block; }
   .tooltip:hover::after {
     content: attr(data-tip);
     position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
@@ -94,10 +100,11 @@
     padding: 24px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 16px;
   }
   .small { font-size: 12px; color: var(--muted); }
-  .danger { color: var(--danger); }
   .ok { color: var(--ok); }
+
   .toggle {
     display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; font-weight: 600;
+    outline: none; box-shadow: none;
   }
   .toggle input { width: 0; height: 0; appearance: none; }
   .pill {
@@ -105,11 +112,11 @@
   }
   .dot { position: absolute; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border-radius: 50%; background: var(--text); left: 3px; transition: left .15s ease; }
   .toggle input:checked + .pill .dot { left: 23px; }
-  .sr { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+
   .footer-note { margin-top: 30px; font-size: 12px; color: var(--muted); }
 </style>
 </head>
-<body class="">
+<body>
 <header>
   <div class="wrap">
     <div class="row">
@@ -131,19 +138,14 @@
 <main class="wrap" style="display:flex; flex-direction: column; gap: 16px;">
 
   <section class="panel">
-    <div class="row" style="gap: 8px;">
-      <label for="fileInput" class="btn tooltip" data-tip="Choose a PDF from your computer (processed 100% locally).">
-        📥 Upload PDF
-      </label>
+    <div class="row" style="gap: 8px; align-items:center;">
+      <label for="fileInput" class="btn tooltip" data-tip="Choose a PDF from your computer (processed 100% locally).">📥 Upload PDF</label>
       <input id="fileInput" type="file" accept="application/pdf,.pdf"/>
 
-      <button id="startBtn" class="primary tooltip" disabled
-              data-tip="Starts extraction. Processing progress shown below.">
-        ▶️ Start Processing
-      </button>
+      <button id="startBtn" class="primary tooltip" disabled data-tip="Starts extraction. Processing progress shown below.">▶️ Start Processing</button>
 
       <button id="selectAllBtn" disabled>Select All</button>
-      <button id="deselectAllBtn" disabled>Deselet All</button>
+      <button id="deselectAllBtn" disabled>Deselect All</button>
 
       <div class="tooltip" data-tip="Default sorts by pixel area (width×height), largest first. Smart Sort also considers file size and pushes icons/tiny images last.">
         <button id="defaultSortBtn" disabled>Sort: Size (default)</button>
@@ -153,7 +155,7 @@
       </div>
 
       <button id="downloadSelectedZipBtn" class="success" disabled>Download Selected (ZIP)</button>
-      <button id="downloadAllZipBtn" class="" disabled>Download All (ZIP)</button>
+      <button id="downloadAllZipBtn" disabled>Download All (ZIP)</button>
 
       <div class="spacer"></div>
       <div class="small" id="pdfName">No file chosen</div>
@@ -174,7 +176,7 @@
   </section>
 
   <section class="footer-note">
-    <div><b>Notes & Limitations:</b> Extracts embedded images. JPEG is fully supported. PNG/raw (FlateDecode) support depends on PDF encoding; some advanced predictors or color spaces may be skipped. Thumbnails are scaled previews only—downloads are full-quality PNG.</div>
+    <div><b>Notes & Limitations:</b> Extracts embedded images. JPEG is fully supported. PNG/raw (FlateDecode) support depends on PDF encoding; PNG-style predictors (10–15) handled for 8bpc DeviceRGB/DeviceGray. Thumbnails are previews—downloads are full-quality PNG.</div>
   </section>
 
 </main>
@@ -199,17 +201,7 @@
 <script>
 /* ===========================================================
    PDF Image Extractor (Single-file, Client-side, Offline)
-   Approach:
-   - Parse PDF bytes for image objects (/Subtype /Image)
-   - Extract stream and dictionary (Width, Height, Filter, ColorSpace)
-   - Supported filters:
-       * DCTDecode (JPEG)  -> decode via <img>, canvas to PNG
-       * JPXDecode (JPEG2000) -> best-effort (browser support varies)
-       * FlateDecode (raw) -> best-effort if 8bpc DeviceRGB/DeviceGray
-         with Predictor 1/absent using DecompressionStream if available
-   - Create PNGs via Canvas for consistent output
-   - Deduplicate via SHA-256 on resulting PNG bytes
-   - UI: thumbnails, metadata, sorting, selection, ZIP (store method)
+   No pdf.js usage. Directly parses /Subtype /Image objects.
 =========================================================== */
 
 const els = {
@@ -263,7 +255,6 @@ els.startBtn.addEventListener('click', async () => {
     state.rawBytes = await state.pdfFile.arrayBuffer();
     updateProgress(0, 'Scanning PDF…');
     const items = await extractImagesFromPDF(new Uint8Array(state.rawBytes));
-    // Convert & dedupe
     if (items.length === 0) {
       showEmpty('No images found in this PDF.');
       finalizeStats();
@@ -302,15 +293,11 @@ els.smartSortBtn.addEventListener('click', () => {
 
 els.downloadSelectedZipBtn.addEventListener('click', async () => {
   const chosen = state.images.filter(i => i.selected);
-  if (chosen.length === 0) {
-    alert('No images selected.');
-    return;
-  }
+  if (chosen.length === 0) { alert('No images selected.'); return; }
   const zipBlob = await buildZipFromImages(chosen);
   const a = document.createElement('a');
-  const zipName = `${state.pdfNameBase}_images.zip`;
   a.href = URL.createObjectURL(zipBlob);
-  a.download = zipName;
+  a.download = `${state.pdfNameBase}_images.zip`;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
@@ -319,15 +306,11 @@ els.downloadSelectedZipBtn.addEventListener('click', async () => {
 
 els.downloadAllZipBtn.addEventListener('click', async () => {
   const chosen = state.images.slice();
-  if (chosen.length === 0) {
-    alert('Nothing to download.');
-    return;
-  }
+  if (chosen.length === 0) { alert('Nothing to download.'); return; }
   const zipBlob = await buildZipFromImages(chosen);
   const a = document.createElement('a');
-  const zipName = `${state.pdfNameBase}_images.zip`;
   a.href = URL.createObjectURL(zipBlob);
-  a.download = zipName;
+  a.download = `${state.pdfNameBase}_images.zip`;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
@@ -372,16 +355,10 @@ function finalizeStats(){
 
 // Rendering
 function renderImages(){
-  // sort according to state.sortMode
   sortImages();
-  if (state.images.length === 0) {
-    showEmpty('No images found after processing.');
-    return;
-  }
+  if (state.images.length === 0) { showEmpty('No images found after processing.'); return; }
   const frag = document.createDocumentFragment();
-  for (const it of state.images) {
-    frag.appendChild(renderCard(it));
-  }
+  for (const it of state.images) frag.appendChild(renderCard(it));
   els.gallery.innerHTML = '';
   els.gallery.appendChild(frag);
 }
@@ -391,7 +368,7 @@ function renderCard(it){
 
   const img = document.createElement('img');
   img.className = 'thumb';
-  img.src = it.srcObjectUrl; // PNG blob preview (full PNG but scaled by CSS)
+  img.src = it.srcObjectUrl;
   img.alt = it.name;
   img.loading = 'lazy';
   img.title = 'Click to open full-size in new tab';
@@ -407,29 +384,18 @@ function renderCard(it){
   const meta = document.createElement('div');
   meta.className = 'meta';
 
-  // top row: checkbox + filename badge
-  const row1 = document.createElement('div');
-  row1.className = 'row';
-
+  const row1 = document.createElement('div'); row1.className = 'row';
   const label = document.createElement('label');
-  label.style.display = 'flex';
-  label.style.alignItems = 'center';
-  label.style.gap = '8px';
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.checked = !!it.selected;
-  cb.addEventListener('change', () => it.selected = cb.checked);
-  const bname = document.createElement('span');
-  bname.className = 'badge';
-  bname.textContent = it.name;
-  label.appendChild(cb);
-  label.appendChild(bname);
+  label.style.display = 'flex'; label.style.alignItems = 'center'; label.style.gap = '8px';
+  const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!it.selected;
+  cb.addEventListener('change', () => { it.selected = cb.checked; sel.innerHTML = cb.checked ? `<span class="ok">Selected</span>` : `Not selected`; });
+  const bname = document.createElement('span'); bname.className = 'badge'; bname.textContent = it.name;
+  label.appendChild(cb); label.appendChild(bname);
 
-  // individual download
   const dlBtn = document.createElement('button');
   dlBtn.textContent = 'Download';
   dlBtn.style.padding = '6px 10px';
-  dlBtn.addEventListener('click', async () => {
+  dlBtn.addEventListener('click', () => {
     const a = document.createElement('a');
     a.href = it.srcObjectUrl;
     a.download = it.name;
@@ -443,22 +409,15 @@ function renderCard(it){
   row1.appendChild(dlBtn);
   meta.appendChild(row1);
 
-  // row2: dims + size
-  const row2 = document.createElement('div');
-  row2.className = 'row';
-  const dims = document.createElement('div'); dims.className = 'small';
-  dims.textContent = `Dimensions: ${it.width}×${it.height}px`;
-  const size = document.createElement('div'); size.className = 'small';
-  size.textContent = `Size: ${it.mb.toFixed(2)} MB`;
-  row2.appendChild(dims);
-  row2.appendChild(size);
+  const row2 = document.createElement('div'); row2.className = 'row';
+  const dims = document.createElement('div'); dims.className = 'small'; dims.textContent = `Dimensions: ${it.width}×${it.height}px`;
+  const size = document.createElement('div'); size.className = 'small'; size.textContent = `Size: ${it.mb.toFixed(2)} MB`;
+  row2.appendChild(dims); row2.appendChild(size);
   meta.appendChild(row2);
 
-  // selection state line
   const sel = document.createElement('div');
   sel.className = 'small';
   sel.innerHTML = it.selected ? `<span class="ok">Selected</span>` : `Not selected`;
-  cb.addEventListener('change', ()=>{ sel.innerHTML = cb.checked ? `<span class="ok">Selected</span>` : `Not selected`; });
   meta.appendChild(sel);
 
   card.appendChild(meta);
@@ -467,11 +426,10 @@ function renderCard(it){
 
 function sortImages(){
   const arr = state.images;
-  if (arr.length === 0) return;
+  if (!arr.length) return;
   if (state.sortMode === 'default') {
     arr.sort((a,b) => (b.width*b.height) - (a.width*a.height));
   } else {
-    // Smart sort: blend area and MB vs average -> larger score first
     const areas = arr.map(i => i.width*i.height);
     const sizes = arr.map(i => i.mb);
     const avgA = (areas.reduce((s,v)=>s+v,0) / areas.length) || 1;
@@ -480,7 +438,7 @@ function sortImages(){
       const area = it.width*it.height;
       const wArea = area / avgA;
       const wSize = it.mb / avgS;
-      it._smartScore = 0.6*wArea + 0.4*wSize; // weight area more than size
+      it._smartScore = 0.6*wArea + 0.4*wSize;
     }
     arr.sort((a,b) => (b._smartScore - a._smartScore));
   }
@@ -491,68 +449,59 @@ function sortImages(){
 ============================ */
 
 async function extractImagesFromPDF(u8){
-  // We decode whole file to a Latin1 string (1:1 bytes mapping) for robust token search.
   const text = new TextDecoder('latin1').decode(u8);
   const reObj = /(\d+)\s+(\d+)\s+obj([\s\S]*?)endobj/g;
   let m;
   const items = [];
-  let objIndex = 0;
   while ((m = reObj.exec(text)) !== null) {
-    objIndex++;
     const objContent = m[3];
     if (!/\/Subtype\s*\/Image/.test(objContent)) continue;
-    const dictAndStream = objContent;
-    const dictMatch = /<<(.*?)>>/s.exec(dictAndStream);
+
+    const dictMatch = /<<(.*?)>>/s.exec(objContent);
     if (!dictMatch) continue;
     const dictStr = dictMatch[1];
 
     const width = pickInt(dictStr, /\/Width\s+(\d+)/);
     const height = pickInt(dictStr, /\/Height\s+(\d+)/);
     const bits = pickInt(dictStr, /\/BitsPerComponent\s+(\d+)/) || 8;
-    const cs = pickName(dictStr, /\/ColorSpace\s+\/([A-Za-z0-9]+)/) || 'DeviceRGB';
 
-    // Filter can be a name or an array
+    // ColorSpace can be /DeviceRGB, /DeviceGray, or array; we only handle simple names here
+    let cs = pickName(dictStr, /\/ColorSpace\s+\/([A-Za-z0-9]+)/) || 'DeviceRGB';
+
+    // Filter(s)
     let filter = pickName(dictStr, /\/Filter\s+\/([A-Za-z0-9]+)/) || null;
     const filterArr = pickArrayNames(dictStr, /\/Filter\s+\[([^\]]+)\]/);
     if (!filter && filterArr.length) filter = filterArr[0];
-    const predictor = pickInt(dictStr, /\/DecodeParms[\s\S]*?\/Predictor\s+(\d+)/) || 1;
 
-    // Locate "stream" ..."endstream" (Latin1 safe)
-    const streamStart = dictAndStream.indexOf('stream', dictStr.length);
-    const streamEnd = dictAndStream.indexOf('endstream', streamStart);
+    // DecodeParms: Predictor, Colors, Columns
+    const predictor = pickInt(dictStr, /\/DecodeParms[\s\S]*?\/Predictor\s+(\d+)/) || 1;
+    const colors = pickInt(dictStr, /\/DecodeParms[\s\S]*?\/Colors\s+(\d+)/) || (cs==='DeviceRGB' ? 3 : 1);
+    const columns = pickInt(dictStr, /\/DecodeParms[\s\S]*?\/Columns\s+(\d+)/) || width;
+
+    // Locate stream..endstream
+    const streamStart = objContent.indexOf('stream', dictMatch[0].length);
+    const streamEnd = objContent.indexOf('endstream', streamStart);
     if (streamStart === -1 || streamEnd === -1) continue;
 
-    // Account for EOL after stream
     let dataStartInObj = streamStart + 'stream'.length;
-    if (dictAndStream[dataStartInObj] === '\r' && dictAndStream[dataStartInObj+1] === '\n') dataStartInObj += 2;
-    else if (dictAndStream[dataStartInObj] === '\n') dataStartInObj += 1;
+    if (objContent[dataStartInObj] === '\r' && objContent[dataStartInObj+1] === '\n') dataStartInObj += 2;
+    else if (objContent[dataStartInObj] === '\n') dataStartInObj += 1;
 
-    const objStartInFile = m.index; // offset in full text
+    const objStartInFile = m.index;
     const start = objStartInFile + dataStartInObj;
     const end = objStartInFile + streamEnd;
 
-    // Slice bytes
     const bytes = u8.subarray(start, end);
 
-    items.push({
-      index: items.length + 1,
-      width, height, bits, cs, filter, predictor,
-      bytes
-    });
+    items.push({ index: items.length + 1, width, height, bits, cs, filter, predictor, colors, columns, bytes });
   }
   return items;
 }
 
-function pickInt(s, re){
-  const m = re.exec(s);
-  return m ? parseInt(m[1],10) : null;
-}
-function pickName(s, re){
-  const m = re.exec(s); return m ? m[1] : null;
-}
+function pickInt(s, re){ const m = re.exec(s); return m ? parseInt(m[1],10) : null; }
+function pickName(s, re){ const m = re.exec(s); return m ? m[1] : null; }
 function pickArrayNames(s, re){
-  const m = re.exec(s);
-  if(!m) return [];
+  const m = re.exec(s); if(!m) return [];
   const inner = m[1];
   return (inner.match(/\/([A-Za-z0-9]+)/g) || []).map(t => t.slice(1));
 }
@@ -561,33 +510,25 @@ function pickArrayNames(s, re){
    Convert to PNG & Deduplicate by SHA256
 ======================================= */
 async function convertAllToPNGAndDedup(items){
-  // We'll convert sequentially to avoid memory spikes
   const total = items.length;
-  let done = 0;
-
   const seen = new Set();
   const results = [];
   const base = state.pdfNameBase;
 
   for (let i=0;i<total;i++){
+    updateProgress(Math.round((i/total)*100), `Processing image ${i+1}/${total}…`);
     const it = items[i];
-    updateProgress(Math.round(((i)/total)*100), `Processing image ${i+1}/${total}…`);
-
     try {
       const pngBlob = await convertOneToPNG(it);
       if (!pngBlob) continue;
 
       const ab = await pngBlob.arrayBuffer();
       const hash = await sha256Hex(new Uint8Array(ab));
-      if (seen.has(hash)) {
-        state.removedDuplicates += 1;
-        continue;
-      }
+      if (seen.has(hash)) { state.removedDuplicates++; continue; }
       seen.add(hash);
 
-      // Confirm real dimensions via decoded PNG (create Image)
+      const { w:realW, h:realH } = await getImageSizeFromBlob(pngBlob, it.width, it.height);
       const url = URL.createObjectURL(pngBlob);
-      const { w:realW, h:realH } = await probeImageSize(url, it.width, it.height);
 
       const name = `${base}_img${results.length+1}.png`;
       results.push({
@@ -602,15 +543,15 @@ async function convertAllToPNGAndDedup(items){
     } catch (e) {
       console.warn('Skipping an image due to error', e);
     }
-    done++;
-    updateProgress(Math.round((done/total)*100), `Processing image ${Math.min(done,total)}/${total}…`);
   }
+  updateProgress(100, `Done (${results.length} images).`);
   state.images = results;
 }
 
 /* Convert a single PDF image object to PNG Blob */
 async function convertOneToPNG(item){
-  const { bytes, filter, width, height, bits, cs, predictor } = item;
+  const { bytes, filter, width, height, bits, cs, predictor, colors, columns } = item;
+
   // JPEG (DCTDecode)
   if (/^DCTDecode$/i.test(filter)) {
     const jpegBlob = new Blob([bytes], { type: 'image/jpeg' });
@@ -619,7 +560,8 @@ async function convertOneToPNG(item){
     cleanupCanvas(canvas, ctx, img);
     return png;
   }
-  // JPEG2000 (best-effort)
+
+  // JPEG2000 (best-effort; may fail if browser lacks decoder)
   if (/^JPXDecode$/i.test(filter)) {
     const jpxBlob = new Blob([bytes], { type: 'image/jp2' });
     try {
@@ -628,64 +570,149 @@ async function convertOneToPNG(item){
       cleanupCanvas(canvas, ctx, img);
       return png;
     } catch {
-      // Some browsers don't support JP2
       console.warn('JPEG2000 not supported by this browser.');
       return null;
     }
   }
-  // FlateDecode raw raster (basic support)
+
+  // FlateDecode raw raster (basic DeviceRGB/DeviceGray, 8bpc)
   if (/^FlateDecode$/i.test(filter)) {
-    // Only handle simple DeviceRGB/DeviceGray with 8 bits and Predictor 1 (or missing)
-    if (!((bits===8) && (cs==='DeviceRGB' || cs==='DeviceGray') && (predictor===1))) {
-      console.warn('Skipping FlateDecode image (unsupported color space/predictor/bpc).');
+    if (!(bits===8 && (cs==='DeviceRGB' || cs==='DeviceGray'))) {
+      console.warn('Skipping FlateDecode image (unsupported color space/bpc).');
       return null;
     }
-    let raw;
+    let inflated;
     try {
-      raw = await inflateZlib(bytes);
+      inflated = await inflateZlib(bytes);
     } catch (e) {
       console.warn('Flate inflate failed: ', e);
       return null;
     }
-    // Expected length checks: gray = W*H; rgb = W*H*3
-    const expected = (cs==='DeviceRGB') ? width*height*3 : width*height;
-    if (raw.length !== expected) {
-      // Some PDFs include per-row padding or filters not accounted for
-      console.warn('Flate raw length mismatch; skipping.');
-      return null;
+
+    const comps = (cs==='DeviceRGB') ? 3 : 1;
+    if (predictor === 1) {
+      // No PNG filters
+      const expected = width * height * comps;
+      if (inflated.length !== expected) { console.warn('Raw length mismatch; skipping.'); return null; }
+      return rawToPNG(inflated, width, height, comps);
     }
-    // Build ImageData
-    const canvas = document.createElement('canvas');
-    canvas.width = width; canvas.height = height;
-    const ctx = canvas.getContext('2d', { willReadFrequently: false });
-    const imgData = ctx.createImageData(width, height);
-    if (cs==='DeviceRGB') {
-      const src = raw; const dst = imgData.data;
-      let si=0, di=0;
-      for (let i=0;i<width*height;i++){
-        dst[di++] = src[si++]; // R
-        dst[di++] = src[si++]; // G
-        dst[di++] = src[si++]; // B
-        dst[di++] = 255;       // A
+
+    if (predictor >= 10 && predictor <= 15) {
+      // PNG filter method; rows start with a filter byte
+      const rowBytes = columns * comps; // 8bpc
+      const stride = 1 + rowBytes;
+      if (inflated.length !== stride * height) {
+        // Some PDFs set Columns != width; try fallback if Columns seems wrong
+        if (columns !== width) {
+          const altRowBytes = width * comps;
+          const altStride = 1 + altRowBytes;
+          if (inflated.length === altStride * height) {
+            const unfiltered = undoPNGPrediction(inflated, altRowBytes, height, comps);
+            return rawToPNG(unfiltered, width, height, comps);
+          }
+        }
+        console.warn('Predictor data size mismatch; skipping.');
+        return null;
       }
-    } else {
-      const src = raw; const dst = imgData.data;
-      let si=0, di=0;
-      for (let i=0;i<width*height;i++){
-        const v = src[si++];
-        dst[di++] = v; dst[di++] = v; dst[di++] = v; dst[di++] = 255;
-      }
+      const unfiltered = undoPNGPrediction(inflated, rowBytes, height, comps);
+      return rawToPNG(unfiltered, columns, height, comps); // if Columns==width this matches; else it’s what PDF stated
     }
-    ctx.putImageData(imgData, 0, 0);
-    const png = await canvasToPNG(canvas);
-    return png;
+
+    console.warn('Unsupported Predictor:', predictor);
+    return null;
   }
 
   console.warn('Unsupported filter: ', filter);
   return null;
 }
 
-/* Draw a blob image to canvas at its intrinsic size or provided hints */
+/* Turn raw RGB/Gray bytes into PNG via canvas */
+async function rawToPNG(raw, width, height, comps){
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.createImageData(width, height);
+  const dst = imgData.data;
+  if (comps === 3) {
+    let si=0, di=0, n = width*height;
+    for (let i=0;i<n;i++){
+      dst[di++] = raw[si++]; // R
+      dst[di++] = raw[si++]; // G
+      dst[di++] = raw[si++]; // B
+      dst[di++] = 255;       // A
+    }
+  } else {
+    let si=0, di=0, n = width*height;
+    for (let i=0;i<n;i++){
+      const v = raw[si++];
+      dst[di++] = v; dst[di++] = v; dst[di++] = v; dst[di++] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+  return canvasToPNG(canvas);
+}
+
+/* PNG predictor undo (filters 0..4 per row) */
+function undoPNGPrediction(inflated, rowBytes, rows, comps){
+  const out = new Uint8Array(rowBytes * rows);
+  const bpp = comps; // 8bpc => bytes per pixel = comps
+  let src = 0, dst = 0;
+  const priorRow = new Uint8Array(rowBytes);
+
+  for (let y=0; y<rows; y++){
+    const filterType = inflated[src++]; // 0 None,1 Sub,2 Up,3 Average,4 Paeth
+    switch (filterType) {
+      case 0: // None
+        out.set(inflated.subarray(src, src+rowBytes), dst);
+        break;
+      case 1: // Sub
+        for (let x=0; x<rowBytes; x++){
+          const left = (x>=bpp) ? out[dst + x - bpp] : 0;
+          out[dst + x] = (inflated[src + x] + left) & 0xFF;
+        }
+        break;
+      case 2: // Up
+        for (let x=0; x<rowBytes; x++){
+          const up = priorRow[x] || 0;
+          out[dst + x] = (inflated[src + x] + up) & 0xFF;
+        }
+        break;
+      case 3: // Average
+        for (let x=0; x<rowBytes; x++){
+          const left = (x>=bpp) ? out[dst + x - bpp] : 0;
+          const up = priorRow[x] || 0;
+          out[dst + x] = (inflated[src + x] + ((left + up) >> 1)) & 0xFF;
+        }
+        break;
+      case 4: // Paeth
+        for (let x=0; x<rowBytes; x++){
+          const left = (x>=bpp) ? out[dst + x - bpp] : 0;
+          const up = priorRow[x] || 0;
+          const upLeft = (x>=bpp) ? priorRow[x - bpp] : 0;
+          out[dst + x] = (inflated[src + x] + paeth(left, up, upLeft)) & 0xFF;
+        }
+        break;
+      default:
+        // Unknown filter; pass-through as best-effort
+        out.set(inflated.subarray(src, src+rowBytes), dst);
+    }
+    // update priorRow
+    priorRow.set(out.subarray(dst, dst+rowBytes));
+    src += rowBytes; dst += rowBytes;
+  }
+  return out;
+}
+function paeth(a,b,c){
+  const p = a + b - c;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c);
+  if (pa <= pb && pa <= pc) return a;
+  if (pb <= pc) return b;
+  return c;
+}
+
+/* Draw blob to canvas to create PNG (for JPEG/JPX inputs) */
 function drawToCanvas(blob, hintW, hintH){
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -703,33 +730,34 @@ function drawToCanvas(blob, hintW, hintH){
   });
 }
 function canvasToPNG(canvas){
-  return new Promise((resolve) => {
-    canvas.toBlob(b => resolve(b), 'image/png', 1.0);
-  });
+  return new Promise((resolve) => { canvas.toBlob(b => resolve(b), 'image/png', 1.0); });
 }
 function cleanupCanvas(canvas, ctx, img){
   try { URL.revokeObjectURL(img.src); } catch {}
 }
 
-/* Probe image size from Blob URL */
-function probeImageSize(url, fallbackW, fallbackH){
-  return new Promise((resolve,reject)=>{
+/* Get size of PNG blob without revoking the URL we need later */
+async function getImageSizeFromBlob(blob, fallbackW, fallbackH){
+  // Fast path: createImageBitmap
+  if ('createImageBitmap' in window) {
+    try {
+      const bmp = await createImageBitmap(blob);
+      const w = bmp.width, h = bmp.height;
+      bmp.close();
+      return { w, h };
+    } catch {}
+  }
+  // Fallback: HTMLImageElement
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
     const img = new Image();
-    img.onload = () => {
-      const w = img.naturalWidth || fallbackW || 0;
-      const h = img.naturalHeight || fallbackH || 0;
-      URL.revokeObjectURL(url);
-      // re-create url (we revoked it; caller will create a new one before rendering)
-      const nurl = URL.createObjectURL(new Blob([/*empty*/]));
-      URL.revokeObjectURL(nurl); // placeholder; not needed actually
-      resolve({ w, h });
-    };
-    img.onerror = () => resolve({ w: fallbackW||0, h: fallbackH||0 });
+    img.onload = () => { const w = img.naturalWidth||fallbackW||0, h = img.naturalHeight||fallbackH||0; URL.revokeObjectURL(url); resolve({ w, h }); };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve({ w: fallbackW||0, h: fallbackH||0 }); };
     img.src = url;
   });
 }
 
-/* Inflate zlib using DecompressionStream if available (no external libs) */
+/* Inflate zlib using DecompressionStream (Chrome/Edge/Firefox). */
 async function inflateZlib(u8){
   if ('DecompressionStream' in window) {
     const ds = new DecompressionStream('deflate');
@@ -738,7 +766,6 @@ async function inflateZlib(u8){
     const out = await new Response(outStream).arrayBuffer();
     return new Uint8Array(out);
   } else {
-    // Minimal fallback: no inflate available
     throw new Error('DecompressionStream not supported in this browser.');
   }
 }
@@ -752,8 +779,6 @@ async function sha256Hex(u8){
 
 /* ===================
    ZIP (store method)
-   Build a .zip without compression for selected images
-   Spec: local file header + file data + central dir + EOCD
 =================== */
 
 // CRC32
@@ -761,9 +786,7 @@ const CRC32_TABLE = (() => {
   let c, table = [];
   for (let n =0; n < 256; n++) {
     c = n;
-    for (let k=0; k<8; k++) {
-      c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
-    }
+    for (let k=0; k<8; k++) c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
     table[n] = c >>> 0;
   }
   return table;
@@ -771,21 +794,13 @@ const CRC32_TABLE = (() => {
 function crc32(u8){
   let c = 0 ^ (-1);
   for (let i=0;i<u8.length;i++){
-    c = (c >>> 0);
     c = (c >>> 8) ^ CRC32_TABLE[(c ^ u8[i]) & 0xFF];
   }
   return (c ^ (-1)) >>> 0;
 }
-
-function strToU8(s){
-  const u = new Uint8Array(s.length);
-  for (let i=0;i<s.length;i++) u[i] = s.charCodeAt(i) & 0xFF;
-  return u;
-}
+function strToU8(s){ const u = new Uint8Array(s.length); for (let i=0;i<s.length;i++) u[i] = s.charCodeAt(i) & 0xFF; return u; }
 function writeUint16LE(v){ return new Uint8Array([v & 0xFF, (v>>8) & 0xFF]); }
-function writeUint32LE(v){
-  return new Uint8Array([v & 0xFF, (v>>8)&0xFF, (v>>16)&0xFF, (v>>24)&0xFF]);
-}
+function writeUint32LE(v){ return new Uint8Array([v & 0xFF, (v>>8)&0xFF, (v>>16)&0xFF, (v>>24)&0xFF]); }
 
 async function buildZipFromImages(files){
   // files: [{name, pngBlob}]
@@ -803,7 +818,6 @@ async function buildZipFromImages(files){
     const c = crc32(u8);
     const nameU8 = strToU8(f.name);
 
-    // Local file header
     const LFH = [
       writeUint32LE(0x04034b50),       // signature
       writeUint16LE(20),               // version needed
@@ -819,7 +833,6 @@ async function buildZipFromImages(files){
       nameU8,
       u8
     ];
-
     const lfhSize = LFH.reduce((s,part)=> s + part.length, 0);
     localParts.push(...LFH);
 
@@ -835,7 +848,6 @@ async function buildZipFromImages(files){
     localOffset += lfhSize;
   }
 
-  // Central Directory
   const cdParts = [];
   let cdSize = 0;
   for (const rec of fileRecords) {
@@ -865,7 +877,6 @@ async function buildZipFromImages(files){
   }
 
   const cdOffset = localOffset;
-
   const EOCD = [
     writeUint32LE(0x06054b50),
     writeUint16LE(0), writeUint16LE(0),                 // disk numbers
@@ -900,7 +911,6 @@ function toDosDate(d){
   let day = d.getDate();
   return (y<<9) | (mon<<5) | day;
 }
-
 </script>
 </body>
 </html>
