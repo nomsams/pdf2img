@@ -272,21 +272,15 @@ async function extractImagesViaDiff(pdf) {
         canvasWithoutImages.width = viewport.width;
         canvasWithoutImages.height = viewport.height;
         const ctxWithoutImages = canvasWithoutImages.getContext('2d');
-        // Create a custom operator list that skips image drawing commands
+        
+        // This is the key: use a custom operator list that skips image drawing commands
         const operatorList = await page.getOperatorList();
-        const filteredOps = new pdfjsLib.OperatorList();
-        const imageDrawingOps = [
-            pdfjsLib.OPS.paintImageXObject,
-            pdfjsLib.OPS.paintImageMaskXObject,
-            pdfjsLib.OPS.paintInlineImageXObject,
-            pdfjsLib.OPS.paintInlineImageMaskXObject,
-        ];
-        for (let opIdx = 0; opIdx < operatorList.fnArray.length; opIdx++) {
-            if (!imageDrawingOps.includes(operatorList.fnArray[opIdx])) {
-                filteredOps.add(operatorList.fnArray[opIdx], operatorList.argsArray[opIdx]);
-            }
-        }
-        await page.render({ canvasContext: ctxWithoutImages, viewport, operatorList: filteredOps }).promise;
+        const fakeOperatorList = {
+            fnArray: operatorList.fnArray.map(op => (op === pdfjsLib.OPS.paintImageXObject) ? pdfjsLib.OPS.restore : op),
+            argsArray: operatorList.argsArray
+        };
+        
+        await page.render({ canvasContext: ctxWithoutImages, viewport, operatorList: fakeOperatorList }).promise;
         const dataWithoutImages = ctxWithoutImages.getImageData(0, 0, viewport.width, viewport.height).data;
 
         // DIFF: Find differing pixels
@@ -305,7 +299,7 @@ async function extractImagesViaDiff(pdf) {
         for (const box of boxes) {
             const w = box.maxX - box.minX;
             const h = box.maxY - box.minY;
-            if (w < 5 || h < 5) continue; // Ignore tiny artifacts
+            if (w < 8 || h < 8) continue; // Ignore tiny artifacts
 
             const cropCanvas = document.createElement('canvas');
             cropCanvas.width = w;
@@ -568,4 +562,4 @@ els.downloadAllZipBtn.addEventListener('click', async ()=>{ const chosen=state.i
 })();
 </script>
 </body>
-</html>
+</html>```
